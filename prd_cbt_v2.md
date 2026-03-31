@@ -1,11 +1,11 @@
-# PRODUCT REQUIREMENTS DOCUMENT (PRD) - v3.0
+# PRODUCT REQUIREMENTS DOCUMENT (PRD) - v3.1
 
 **Nama Aplikasi:** Cerdas-CBT (Computer Based Test)
 **Penulis:** EAS Creative Studio
 **Kontak Developer:** eas.creative.studio@gmail.com
-**Versi:** 3.0.0
+**Versi:** 3.1.0
 **Tanggal:** 31 Maret 2026
-**Status:** Final - Fase 1 (Online Mode)
+**Status:** Final - Fase 1 (Online Mode) - Clarified
 
 ---
 
@@ -51,6 +51,17 @@
 - **Ganti Password:** Siswa dapat mengganti password sendiri setelah login.
 - **Reset Password:** Jika siswa lupa password, guru atau super-admin dapat mereset password.
 
+### 2.4. Setup Wizard (First-Run)
+- **Trigger:** Setup wizard muncul saat aplikasi pertama kali di-deploy (belum ada data sekolah).
+- **Proses Setup:**
+  1. Buat akun super-admin (username & password)
+  2. Input identitas sekolah (nama, NPSN, alamat, logo, tahun ajaran)
+  3. Konfirmasi setup
+- **Setelah Setup:**
+  - Wizard tidak muncul lagi (flag `setup_completed = true` di database)
+  - Super-admin dapat login dan mulai membuat akun guru
+- **Reset Setup:** Jika ingin reset setup, jalankan script migration reset atau manual DB update.
+
 ---
 
 ## 3. Fitur Utama (Kebutuhan Fungsional)
@@ -65,6 +76,13 @@
 * **Input Data:**
   * Penambahan data secara manual melalui formulir antarmuka.
   * Impor data massal melalui berkas Excel (.xlsx).
+  * **Format Excel Import Siswa:**
+    | NISN | Nama | Password | Kelas |
+    |------|------|----------|-------|
+    | 1234567890 | Siswa 1 | pass123 | X IPA 1 |
+    * Kolom **Kelas** diisi dengan **Nama Kelas** (contoh: "X IPA 1"), bukan UUID.
+    * Sistem akan match `nama_kelas` dengan data kelas yang sudah ada.
+    * Error jika `nama_kelas` tidak ditemukan → row di-skip dengan warning.
 * **Logika Impor Data Siswa:**
   * **Option 1 (Menimpa):** Update data siswa yang sudah ada (berdasarkan NISN) + tambah siswa baru yang belum ada.
   * **Option 2 (Skip existing):** Hanya tambah siswa baru, siswa dengan NISN yang sudah ada di-skip.
@@ -74,13 +92,16 @@
 ### 3.3. Modul Guru - Manajemen Soal
 * **Pengaturan Format Soal:** Guru menetapkan jumlah opsi jawaban per ujian (contoh: 4 opsi, 5 opsi). Jumlah opsi **konsisten** untuk semua soal dalam satu ujian.
 * **Format Soal:**
-  * Soal dapat mengandung **teks, gambar, dan rumus matematika** (LaTeX/MathJax).
-  * Guru dapat upload gambar untuk soal.
+  * Soal dapat mengandung **teks, gambar, dan rumus matematika** (KaTeX).
+  * **KaTeX Syntax:** Inline math dengan `$...$`, block math dengan `$$...$$`.
+  * Contoh: `$\sqrt{16} = 4$`, `$$\frac{a}{b} + \frac{c}{d}$$`
+  * Guru dapat upload gambar untuk soal (Supabase Storage).
 * **Input Soal Manual:** Formulir dengan kolom: Teks Soal (rich text + gambar + LaTeX), Jawaban Benar, dan Pengecoh (sesuai jumlah opsi).
 * **Impor Soal Excel (.xlsx):**
   * **Format Kolom:** `Soal`, `Gambar_URL`, `Jawaban Benar`, `Pengecoh 1`, `Pengecoh 2`, `Pengecoh 3`, `Pengecoh 4`.
-  * Kolom `Gambar_URL` opsional (isi dengan URL gambar atau kosong).
+  * Kolom `Gambar_URL` opsional (isi dengan URL gambar dari Supabase Storage atau kosong).
   * Kolom `Pengecoh` yang tidak digunakan (misal: Pengecoh 4 untuk ujian 4 opsi) dapat dikosongkan.
+  * **LaTeX/Math Formula:** Gunakan format KaTeX dalam teks soal, contoh: `$\sqrt{16}$` atau `$$\frac{a}{b}$$`.
 * **Revisi Soal:** Guru dapat mengubah soal **hanya jika ujian dalam status nonaktif**.
 
 ### 3.4. Modul Guru - Manajemen Ujian
@@ -144,12 +165,13 @@
 * **Pengacakan:**
   * Urutan soal diacak per siswa (randomized).
   * Urutan opsi jawaban diacak per siswa.
-  * Urutan konsisten jika siswa refresh (seed tetap).
-* **Auto-save:** Jawaban tersimpan real-time setiap kali siswa memilih jawaban.
-* **Offline Mode:** Siswa bisa lanjut mengerjakan jika internet putus, jawaban auto-sync saat online.
+  * Urutan konsisten jika siswa refresh (seed disimpan di `hasil_ujian.seed_soal` & `hasil_ujian.seed_opsi`).
+  * Seed generated saat siswa klik "Mulai Ujian", stored in DB for recovery.
+* **Auto-save:** Jawaban tersimpan real-time setiap kali siswa memilih jawaban (server-side).
 * **Warning Waktu:**
-  * Popup warning saat waktu hampir habis.
-  * Timer berubah warna (merah) saat waktu hampir habis.
+  * Popup warning muncul saat **sisa waktu ≤ 10% dari durasi ujian** (contoh: ujian 60 min → warning pada 6 min remaining).
+  * Timer berubah warna (merah) saat waktu warning threshold.
+  * Timer display format: `MM:SS` (contoh: `05:30`).
 * **Pengumpulan:**
   * Submit manual dengan tombol "Kirim Jawaban".
   * Auto-submit jika waktu habis.
@@ -168,12 +190,13 @@
 
 | Scenario | Handling |
 |----------|----------|
-| Internet putus saat ujian | Offline mode dengan auto-sync ke localStorage, sync saat online |
-| Refresh halaman saat ujian | Timer lanjut (server-side), jawaban tersimpan, urutan soal konsisten |
+| Internet putus saat ujian | Tampilkan error message, jawaban yang sudah tersimpan tetap aman di server. Siswa harus reconnect untuk melanjutkan. |
+| Refresh halaman saat ujian | Timer lanjut (server-side), jawaban tersimpan, urutan soal konsisten (seed dari DB) |
 | Submit berkali-kali | Hanya 1x submit diperbolehkan |
 | Hapus ujian saat siswa mengerjakan | Locked - tidak bisa hapus |
 | Edit soal saat ujian aktif | Tidak bisa edit - ujian harus nonaktif |
 | Upload Excel gagal | Tampilkan error detail, data tidak berubah |
+| Import Excel: Kelas tidak ditemukan | Error per row, siswa dengan kelas tidak valid di-skip dengan warning |
 
 ---
 
@@ -186,6 +209,7 @@
 * **Styling:** Tailwind CSS
 * **UI Components:** Shadcn UI
 * **Icons:** Lucide React
+* **Math Rendering:** KaTeX (CDN: `https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js`)
 * **Theme:** Light mode only
 
 ### 5.2. Tipografi & Warna
@@ -233,6 +257,7 @@
 * **Styling:** Tailwind CSS.
 * **UI Components:** Shadcn UI.
 * **Icons:** Lucide React.
+* **Math Rendering:** KaTeX (CDN, fast LaTeX rendering).
 * **Hosting:** Vercel (auto-deploy dari GitHub).
 * **Database:** Supabase PostgreSQL (managed, free tier 512MB).
 * **Storage:** Supabase Storage (1GB free tier untuk gambar soal).
@@ -349,7 +374,7 @@ Windows Installer → Docker Desktop → PostgreSQL + MinIO → Next.js App
 * Supabase Storage: https://supabase.com/docs/guides/storage
 * Supabase Auth: https://supabase.com/docs/guides/auth
 * Vercel Documentation: https://vercel.com/docs
-* MathJax Documentation: https://docs.mathjax.org
+* KaTeX Documentation: https://katex.org/
 * Inter Font: https://fonts.google.com/specimen/Inter
 * Tailwind CSS: https://tailwindcss.com/docs
 * Shadcn UI: https://ui.shadcn.com
@@ -370,4 +395,4 @@ Windows Installer → Docker Desktop → PostgreSQL + MinIO → Next.js App
 
 ---
 
-**Document Status:** ✅ Final v3.0 - Fase 1 (Online Mode) Ready for Development.
+**Document Status:** ✅ Final v3.1 - Fase 1 (Online Mode) Clarified & Ready for Development.
