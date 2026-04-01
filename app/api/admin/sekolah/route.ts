@@ -1,17 +1,24 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
       )
     }
+    if (session.user.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     const { data: sekolah, error } = await supabase
       .from('identitas_sekolah')
@@ -46,15 +53,21 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = await createClient()
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
       )
     }
+    if (session.user.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     const body = await request.json()
     const {
@@ -98,7 +111,7 @@ export async function PUT(request: Request) {
           website: website || null,
           kepala_sekolah: kepala_sekolah || null,
           tahun_ajaran,
-          updated_by: user.id,
+          updated_by: session.user.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', existingData.id)
@@ -127,7 +140,7 @@ export async function PUT(request: Request) {
           website: website || null,
           kepala_sekolah: kepala_sekolah || null,
           tahun_ajaran,
-          updated_by: user.id,
+          updated_by: session.user.id,
           setup_wizard_completed: true
         })
         .select()

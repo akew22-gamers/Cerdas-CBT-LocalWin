@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 
@@ -9,17 +10,22 @@ interface RouteParams {
 // POST - Reset guru password
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const supabase = await createClient()
-    const { id } = await params
-    
-    // Get current user (super_admin)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
       )
     }
+    if (session.user.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
+    const { id } = await params
 
     const body = await request.json()
     const { new_password } = body
@@ -74,7 +80,7 @@ export async function POST(request: Request, { params }: RouteParams) {
 
     // Log audit
     await supabase.from('audit_log').insert({
-      user_id: user.id,
+      user_id: session.user.id,
       role: 'super_admin',
       action: 'reset_password',
       entity_type: 'guru',

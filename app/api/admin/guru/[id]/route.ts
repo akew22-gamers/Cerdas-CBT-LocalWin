@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 
@@ -9,17 +10,22 @@ interface RouteParams {
 // GET - Get single guru detail
 export async function GET(request: Request, { params }: RouteParams) {
   try {
-    const supabase = await createClient()
-    const { id } = await params
-    
-    // Get current user (super_admin)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
       )
     }
+    if (session.user.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
+    const { id } = await params
 
     const { data: guru, error } = await supabase
       .from('guru')
@@ -53,17 +59,22 @@ export async function GET(request: Request, { params }: RouteParams) {
 // PUT - Update guru data
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
-    const supabase = await createClient()
-    const { id } = await params
-    
-    // Get current user (super_admin)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
       )
     }
+    if (session.user.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
+    const { id } = await params
 
     const body = await request.json()
     const { nama, username } = body
@@ -141,7 +152,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
     // Log audit
     await supabase.from('audit_log').insert({
-      user_id: user.id,
+      user_id: session.user.id,
       role: 'super_admin',
       action: 'update',
       entity_type: 'guru',
@@ -167,17 +178,22 @@ export async function PUT(request: Request, { params }: RouteParams) {
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const supabase = await createClient()
-    const { id } = await params
-    
-    // Get current user (super_admin)
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) {
+    const session = await getSession()
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
       )
     }
+    if (session.user.role !== 'super_admin') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
+    const { id } = await params
 
     // Check if guru exists
     const { data: existingGuru } = await supabase
@@ -234,7 +250,7 @@ export async function DELETE(request: Request, { params }: RouteParams) {
 
     // Log audit
     await supabase.from('audit_log').insert({
-      user_id: user.id,
+      user_id: session.user.id,
       role: 'super_admin',
       action: 'delete',
       entity_type: 'guru',
