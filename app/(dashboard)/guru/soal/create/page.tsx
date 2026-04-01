@@ -118,7 +118,7 @@ export default function SoalCreatePage({ searchParams }: { searchParams: Promise
               <CardTitle>Pilih Ujian</CardTitle>
             </CardHeader>
             <CardContent>
-              <Select value={selectedUjianId ?? ""} onValueChange={(value) => setSelectedUjianId(value)}>
+              <Select value={selectedUjianId ?? ""} onValueChange={(value) => setSelectedUjianId(value ?? "")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih ujian..." />
                 </SelectTrigger>
