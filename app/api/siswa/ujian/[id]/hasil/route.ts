@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -6,16 +7,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
+    const session = await getSession()
 
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
       )
     }
+
+    if (session.user.role !== 'siswa') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     const { id: ujianId } = await params
 
@@ -33,7 +41,7 @@ export async function GET(
         fullscreen_exit_count,
         ujian:ujian!inner(id, judul, show_result, durasi)
       `)
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('ujian_id', ujianId)
       .single()
 

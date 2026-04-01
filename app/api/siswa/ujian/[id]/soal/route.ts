@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { shuffleWithSeed } from '@/lib/utils/randomize'
 
@@ -7,15 +8,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const session = await getSession()
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
       )
     }
+
+    if (session.user.role !== 'siswa') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     const { id: ujianId } = await params
 
@@ -29,7 +38,7 @@ export async function GET(
           durasi
         )
       `)
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('ujian_id', ujianId)
       .single()
 
@@ -70,7 +79,7 @@ export async function GET(
     const { data: jawabanData } = await supabase
       .from('jawaban_siswa')
       .select('soal_id, jawaban_pilihan')
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('ujian_id', ujianId)
 
     const jawabanMap = new Map(jawabanData?.map((j) => [j.soal_id, j.jawaban_pilihan]) || [])

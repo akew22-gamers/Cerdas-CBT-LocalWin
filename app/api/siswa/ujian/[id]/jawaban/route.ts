@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function POST(
@@ -6,15 +7,23 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const session = await getSession()
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
       )
     }
+
+    if (session.user.role !== 'siswa') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     const { id: ujianId } = await params
     const body = await request.json()
@@ -30,7 +39,7 @@ export async function POST(
     const { data: hasil } = await supabase
       .from('hasil_ujian')
       .select('is_submitted')
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('ujian_id', ujianId)
       .single()
 
@@ -66,7 +75,7 @@ export async function POST(
     const { data, error } = await supabase
       .from('jawaban_siswa')
       .upsert({
-        siswa_id: user.id,
+        siswa_id: session.user.id,
         ujian_id: ujianId,
         soal_id,
         jawaban_pilihan,

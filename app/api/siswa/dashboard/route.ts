@@ -1,26 +1,33 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 // GET /api/siswa/dashboard - Dashboard stats and ujian data for siswa
 export async function GET() {
   try {
-    const supabase = await createClient()
+    const session = await getSession()
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
       )
     }
 
+    if (session.user.role !== 'siswa') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
+
     // Get siswa data
     const { data: siswa, error: siswaError } = await supabase
       .from('siswa')
       .select('id, nama, nisn, kelas_id')
-      .eq('id', user.id)
+      .eq('id', session.user.id)
       .single()
 
     if (siswaError || !siswa) {
@@ -34,7 +41,7 @@ export async function GET() {
     const { data: hasilData, error: hasilError } = await supabase
       .from('hasil_ujian')
       .select('nilai')
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('is_submitted', true)
 
     if (hasilError) throw hasilError
@@ -61,7 +68,7 @@ export async function GET() {
       .eq('ujian_kelas.kelas_id', siswa.kelas_id)
       .eq('status', 'aktif')
       .not('id', 'in', `(
-        select ujian_id from hasil_ujian where siswa_id = '${user.id}'
+        select ujian_id from hasil_ujian where siswa_id = '${session.user.id}'
       )`)
 
     if (ujianError) {
@@ -91,7 +98,7 @@ export async function GET() {
           show_result
         )
       `)
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('is_submitted', true)
       .order('waktu_selesai', { ascending: false })
       .limit(5)

@@ -1,20 +1,20 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 // POST /api/upload/image - Upload image to Supabase Storage
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const session = await getSession()
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
       )
     }
+
+    const supabase = createAdminClient()
 
     // Parse form data
     const formData = await request.formData()

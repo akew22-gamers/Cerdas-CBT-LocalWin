@@ -1,17 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import bcrypt from 'bcryptjs'
 import type { ApiSuccessResponse, ApiErrorResponse } from '@/types/api'
 import type { SetupCompleteRequest } from '@/types/api'
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
-  
-  return `$2a$10$${hashHex.substring(0, 53)}`
-}
 
 export async function POST(request: Request) {
   try {
@@ -51,7 +42,7 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    const supabase = await createClient()
+    const supabase = createAdminClient()
 
     const { data: existingSetup } = await supabase
       .from('identitas_sekolah')
@@ -68,8 +59,7 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Hash password
-    const passwordHash = await hashPassword(super_admin.password)
+    const passwordHash = await bcrypt.hash(super_admin.password, 10)
 
     const { data: adminData, error: adminError } = await supabase
       .from('super_admin')

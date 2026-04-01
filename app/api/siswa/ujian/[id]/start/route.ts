@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextRequest, NextResponse } from 'next/server'
 import { generateRandomSeed } from '@/lib/utils/randomize'
 
@@ -7,15 +8,23 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const session = await getSession()
 
-    if (!user) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
       )
     }
+
+    if (session.user.role !== 'siswa') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     const { id: ujianId } = await params
 
@@ -42,7 +51,7 @@ export async function POST(
     const { data: existingHasil, error: existingError } = await supabase
       .from('hasil_ujian')
       .select('id, is_submitted, seed_soal, seed_opsi')
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('ujian_id', ujianId)
       .single()
 
@@ -75,7 +84,7 @@ export async function POST(
     const { data: hasil, error: hasilError } = await supabase
       .from('hasil_ujian')
       .insert({
-        siswa_id: user.id,
+        siswa_id: session.user.id,
         ujian_id: ujianId,
         nilai: 0,
         jumlah_benar: 0,

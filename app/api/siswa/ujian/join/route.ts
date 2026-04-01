@@ -1,20 +1,27 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 // POST /api/siswa/ujian/join - Validate and join ujian by kode_ujian
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient()
+    const session = await getSession()
 
-    // Get current user (siswa)
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
+    if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
       )
     }
+
+    if (session.user.role !== 'siswa') {
+      return NextResponse.json(
+        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
 
     // Parse request body
     const body = await request.json()
@@ -33,7 +40,7 @@ export async function POST(request: Request) {
     const { data: siswa, error: siswaError } = await supabase
       .from('siswa')
       .select('id, kelas_id')
-      .eq('id', user.id)
+      .eq('id', session.user.id)
       .single()
 
     if (siswaError || !siswa) {
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
     const { data: hasilUjian, error: hasilError } = await supabase
       .from('hasil_ujian')
       .select('id, is_submitted')
-      .eq('siswa_id', user.id)
+      .eq('siswa_id', session.user.id)
       .eq('ujian_id', ujian.id)
       .single()
 
