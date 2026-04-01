@@ -1,15 +1,16 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 import { AssignKelasDialog } from "@/components/ujian/AssignKelasDialog"
 import Link from "next/link"
-import { 
-  Clock, 
-  FileText, 
-  Users, 
-  ToggleLeft, 
-  ToggleRight, 
+import {
+  Clock,
+  FileText,
+  Users,
+  ToggleLeft,
+  ToggleRight,
   Copy,
   Pencil,
   Trash2,
@@ -19,19 +20,17 @@ import {
 } from "lucide-react"
 
 async function getUjianDetail(id: string) {
-  const supabase = await createClient()
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     return null
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    return null
+  }
+
+  const supabase = createAdminClient()
 
   const { data: ujian } = await supabase
     .from("ujian")
@@ -48,7 +47,7 @@ async function getUjianDetail(id: string) {
       soal_count:soal(count)
     `)
     .eq("id", id)
-    .eq("created_by", user.id)
+    .eq("created_by", session.user.id)
     .single()
 
   if (!ujian) {
@@ -85,12 +84,11 @@ async function getUjianDetail(id: string) {
       jumlah_soal: ujian.soal_count?.[0]?.count || 0
     },
     soal: soalList || [],
-    user: { nama: guru?.nama || "Guru", role: "guru" }
+    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
   }
 }
 
 export default async function UjianDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
   const { id } = await params
   const data = await getUjianDetail(id)
 

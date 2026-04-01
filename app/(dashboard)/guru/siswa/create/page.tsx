@@ -1,33 +1,34 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SiswaForm } from '@/components/siswa/SiswaForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default async function CreateSiswaPage() {
-  const supabase = await createClient()
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  if (!session) {
     redirect('/login')
   }
 
-  const { data: guruData } = await supabase
-    .from('guru')
-    .select('nama')
-    .eq('id', user.id)
-    .single()
+  if (session.user.role !== 'guru') {
+    redirect('/login')
+  }
+
+  const supabase = createAdminClient()
 
   const { data: kelasList } = await supabase
     .from('kelas')
     .select('id, nama_kelas')
-    .eq('created_by', user.id)
+    .eq('created_by', session.user.id)
     .order('nama_kelas', { ascending: true })
 
   return (
     <DashboardLayout
       user={{
-        nama: guruData?.nama || 'Guru',
+        nama: session.user.nama || 'Guru',
+        username: session.user.username,
         role: 'guru'
       }}
     >

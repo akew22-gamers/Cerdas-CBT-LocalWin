@@ -1,5 +1,6 @@
-import { createClient } from "@/lib/supabase/server"
 import { redirect } from "next/navigation"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { GuruDashboardClient } from "./GuruDashboardClient"
 
 interface DashboardData {
@@ -17,24 +18,13 @@ interface DashboardData {
   }[]
 }
 
-async function getDashboardData(): Promise<{ data: DashboardData; user: { nama: string; role: string }; ujianIds: string[] }> {
-  const supabase = await createClient()
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+async function getDashboardData(userId: string): Promise<{ data: DashboardData; user: { nama: string | null; username: string; role: string }; ujianIds: string[] }> {
+  const supabase = createAdminClient()
 
   const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/guru/dashboard`, {
     headers: {
-      'Cookie': (await supabase.auth.getSession()).data.session ? `sb-access-token=${(await supabase.auth.getSession()).data.session?.access_token}` : ''
+      'X-User-Id': userId,
+      'X-User-Role': 'guru'
     }
   })
 
@@ -47,7 +37,7 @@ async function getDashboardData(): Promise<{ data: DashboardData; user: { nama: 
         ujian_aktif: 0,
         recent_hasil: []
       },
-      user: { nama: guru?.nama || "Guru", role: "guru" },
+      user: { nama: null, username: '', role: "guru" },
       ujianIds: []
     }
   }
@@ -57,20 +47,38 @@ async function getDashboardData(): Promise<{ data: DashboardData; user: { nama: 
   const { data: activeUjian } = await supabase
     .from('ujian')
     .select('id')
-    .eq('created_by', user.id)
+    .eq('created_by', userId)
     .eq('status', 'aktif')
 
   return {
     data: result.data,
-    user: { nama: guru?.nama || "Guru", role: "guru" },
-    ujianIds: activeUjian ? activeUjian.map((u: any) => u.id) : []
+    user: { nama: null, username: '', role: "guru" },
+    ujianIds: activeUjian ? activeUjian.map((u: { id: string }) => u.id) : []
   }
 }
 
 export default async function GuruDashboardPage() {
-  const { data, user, ujianIds } = await getDashboardData()
+  const session = await getSession()
+
+  if (!session) {
+    redirect("/login")
+  }
+
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
+
+  const { data, ujianIds } = await getDashboardData(session.user.id)
 
   return (
-    <GuruDashboardClient initialData={data} ujianIds={ujianIds} user={user} />
+    <GuruDashboardClient
+      initialData={data}
+      ujianIds={ujianIds}
+      user={{
+        nama: session.user.nama,
+        username: session.user.username,
+        role: "guru"
+      }}
+    />
   )
 }

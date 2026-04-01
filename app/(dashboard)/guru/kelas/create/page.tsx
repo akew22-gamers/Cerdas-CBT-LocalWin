@@ -1,26 +1,23 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { KelasForm } from "@/components/kelas/KelasForm"
 import Link from "next/link"
 
 async function getGuruInfo() {
-  const supabase = await createClient()
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     redirect("/login")
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
 
   return {
-    user: { nama: guru?.nama || "Guru", role: "guru" },
+    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
   }
 }
 

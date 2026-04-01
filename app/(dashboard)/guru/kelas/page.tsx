@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { KelasTable } from "@/components/kelas/KelasTable"
@@ -12,20 +13,18 @@ interface Kelas {
   created_at: string
 }
 
-async function getKelasList(): Promise<{ kelas: Kelas[]; user: { nama: string; role: string } }> {
-  const supabase = await createClient()
+async function getKelasList(): Promise<{ kelas: Kelas[]; user: { nama: string; username: string; role: string } }> {
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     redirect("/login")
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
+
+  const supabase = createAdminClient()
 
   const { data: kelasList, error } = await supabase
     .from("kelas")
@@ -35,12 +34,15 @@ async function getKelasList(): Promise<{ kelas: Kelas[]; user: { nama: string; r
       created_at,
       siswa_count:siswa(count)
     `)
-    .eq("created_by", user.id)
+    .eq("created_by", session.user.id)
     .order("nama_kelas", { ascending: true })
 
   if (error) {
     console.error("Error fetching kelas:", error)
-    return { kelas: [], user: { nama: guru?.nama || "Guru", role: "guru" } }
+    return {
+      kelas: [],
+      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
+    }
   }
 
   const formattedKelas: Kelas[] = kelasList.map((k: any) => ({
@@ -52,7 +54,7 @@ async function getKelasList(): Promise<{ kelas: Kelas[]; user: { nama: string; r
 
   return {
     kelas: formattedKelas,
-    user: { nama: guru?.nama || "Guru", role: "guru" },
+    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
   }
 }
 
@@ -75,7 +77,7 @@ export default async function KelasListPage() {
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <KelasTable data={kelas} onDelete={() => {}} />
+          <KelasTable data={kelas} />
         </div>
       </div>
     </DashboardLayout>

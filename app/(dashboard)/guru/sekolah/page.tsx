@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getSession } from '@/lib/auth/session'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SekolahDisplay } from '@/components/sekolah/SekolahDisplay'
@@ -6,18 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertCircle } from 'lucide-react'
 
 export default async function GuruSekolahPage() {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
+  const session = await getSession()
+
+  if (!session) {
     redirect('/login')
   }
 
-  const { data: guruData } = await supabase
-    .from('guru')
-    .select('nama')
-    .eq('id', user.id)
-    .single()
+  if (session.user.role !== 'guru') {
+    redirect('/login')
+  }
+
+  const supabase = createAdminClient()
 
   const { data: sekolahData } = await supabase
     .from('identitas_sekolah')
@@ -41,7 +41,8 @@ export default async function GuruSekolahPage() {
   return (
     <DashboardLayout
       user={{
-        nama: guruData?.nama || 'Guru',
+        nama: session.user.nama || 'Guru',
+        username: session.user.username,
         role: 'guru'
       }}
     >

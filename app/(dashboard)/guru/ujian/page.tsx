@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { UjianTable } from "@/components/ujian/UjianTable"
@@ -23,20 +24,18 @@ interface Ujian {
   jumlah_soal: number
 }
 
-async function getUjianList(): Promise<{ ujian: Ujian[]; user: { nama: string; role: string } }> {
-  const supabase = await createClient()
+async function getUjianList(): Promise<{ ujian: Ujian[]; user: { nama: string; username: string; role: string } }> {
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     redirect("/login")
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
+
+  const supabase = createAdminClient()
 
   const { data: ujianList, error } = await supabase
     .from("ujian")
@@ -52,12 +51,12 @@ async function getUjianList(): Promise<{ ujian: Ujian[]; user: { nama: string; r
       ujian_kelas(kelas_id, kelas(nama_kelas)),
       soal_count:soal(count)
     `)
-    .eq("created_by", user.id)
+    .eq("created_by", session.user.id)
     .order("created_at", { ascending: false })
 
   if (error) {
     console.error("Error fetching ujian:", error)
-    return { ujian: [], user: { nama: guru?.nama || "Guru", role: "guru" } }
+    return { ujian: [], user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" } }
   }
 
   const formattedUjian: Ujian[] = ujianList.map((u: any) => {
@@ -87,7 +86,7 @@ async function getUjianList(): Promise<{ ujian: Ujian[]; user: { nama: string; r
 
   return {
     ujian: formattedUjian,
-    user: { nama: guru?.nama || "Guru", role: "guru" }
+    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
   }
 }
 
@@ -110,11 +109,7 @@ export default async function UjianListPage() {
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <UjianTable 
-            data={ujian} 
-            onDelete={() => {}}
-            onToggle={() => {}}
-          />
+          <UjianTable data={ujian} />
         </div>
       </div>
     </DashboardLayout>

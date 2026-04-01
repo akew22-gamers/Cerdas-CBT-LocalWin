@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { KelasForm } from "@/components/kelas/KelasForm"
@@ -9,25 +10,23 @@ interface EditKelasPageProps {
 }
 
 async function getKelasData(id: string) {
-  const supabase = await createClient()
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     redirect("/login")
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
+
+  const supabase = createAdminClient()
 
   const { data: kelas, error } = await supabase
     .from("kelas")
     .select("id, nama_kelas")
     .eq("id", id)
-    .eq("created_by", user.id)
+    .eq("created_by", session.user.id)
     .single()
 
   if (error || !kelas) {
@@ -35,7 +34,7 @@ async function getKelasData(id: string) {
   }
 
   return {
-    user: { nama: guru?.nama || "Guru", role: "guru" },
+    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
     kelas,
   }
 }

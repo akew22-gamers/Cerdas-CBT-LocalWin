@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
 import { DashboardLayout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -17,7 +16,7 @@ import {
 } from "@/components/ui/table"
 import { FileDown, ArrowLeft, Loader2, Users, TrendingUp, Target } from "lucide-react"
 import Link from "next/link"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 
 interface SoalStat {
   soal_id: string
@@ -58,11 +57,13 @@ interface Ujian {
 
 interface User {
   nama: string
+  username: string
   role: string
 }
 
 export default function HasilDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const ujianId = params.ujian_id as string
 
   const [user, setUser] = useState<User | null>(null)
@@ -78,36 +79,38 @@ export default function HasilDetailPage() {
   }, [ujianId])
 
   const fetchData = async () => {
-    const supabase = createClient()
-
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) return
-
-    const { data: guru } = await supabase
-      .from("guru")
-      .select("nama")
-      .eq("id", authUser.id)
-      .single()
-
-    setUser({ nama: guru?.nama || "Guru", role: "guru" })
-
-    const { data: ujianData } = await supabase
-      .from("ujian")
-      .select("id, judul, kode_ujian")
-      .eq("id", ujianId)
-      .single()
-
-    setUjian(ujianData)
+    try {
+      const meRes = await fetch('/api/auth/me', { credentials: 'include' })
+      if (!meRes.ok) {
+        router.push('/login')
+        return
+      }
+      const meData = await meRes.json()
+      if (!meData.success || meData.data?.user?.role !== 'guru') {
+        router.push('/login')
+        return
+      }
+      setUser({
+        nama: meData.data.user.nama || 'Guru',
+        username: meData.data.user.username,
+        role: 'guru'
+      })
+    } catch (error) {
+      console.error('Failed to get session:', error)
+      router.push('/login')
+      return
+    }
 
     try {
-      const statsResponse = await fetch(`/api/guru/hasil/${ujianId}/stats`)
+      const statsResponse = await fetch(`/api/guru/hasil/${ujianId}/stats`, { credentials: 'include' })
       const statsResult = await statsResponse.json()
       if (statsResult.success) {
         setStats(statsResult.data.stats)
         setSummary(statsResult.data.summary)
+        setUjian(statsResult.data.ujian)
       }
 
-      const hasilResponse = await fetch(`/api/guru/hasil?ujian_id=${ujianId}`)
+      const hasilResponse = await fetch(`/api/guru/hasil?ujian_id=${ujianId}`, { credentials: 'include' })
       const hasilResult = await hasilResponse.json()
       if (hasilResult.success) {
         setHasilList(hasilResult.data.hasil)

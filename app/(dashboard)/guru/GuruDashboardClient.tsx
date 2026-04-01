@@ -25,7 +25,7 @@ interface GuruDashboardClientProps {
     }>
   }
   ujianIds: string[]
-  user: { nama: string; role: string }
+  user: { nama: string | null; username?: string; role: string }
 }
 
 export function GuruDashboardClient({ initialData, ujianIds, user }: GuruDashboardClientProps) {
@@ -90,9 +90,9 @@ export function GuruDashboardClient({ initialData, ujianIds, user }: GuruDashboa
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Selamat datang kembali, {user.nama}
-            </p>
+<p className="text-gray-500 text-sm mt-1">
+               Selamat datang kembali, {user.nama || user.username || 'Guru'}
+             </p>
           </div>
           <div className="flex items-center gap-4">
             {isSubscribed && sessionCount > 0 && (

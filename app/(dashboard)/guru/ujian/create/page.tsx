@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { UjianForm } from "@/components/ujian/UjianForm"
@@ -6,22 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FileText } from "lucide-react"
 
 export default async function CreateUjianPage() {
-  const supabase = await createClient()
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     redirect("/login")
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
 
   return (
-    <DashboardLayout user={{ nama: guru?.nama || "Guru", role: "guru" }}>
+    <DashboardLayout user={{ nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }}>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Buat Ujian Baru</h1>

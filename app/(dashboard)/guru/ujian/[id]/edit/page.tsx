@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { UjianForm } from "@/components/ujian/UjianForm"
@@ -6,26 +7,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { FileText } from "lucide-react"
 
 export default async function EditUjianPage({ params }: { params: Promise<{ id: string }> }) {
-  const supabase = await createClient()
+  const session = await getSession()
   const { id } = await params
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     redirect("/login")
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
+
+  const supabase = createAdminClient()
 
   const { data: ujian, error } = await supabase
     .from("ujian")
     .select("id, kode_ujian, judul, durasi, jumlah_opsi, show_result, status")
     .eq("id", id)
-    .eq("created_by", user.id)
+    .eq("created_by", session.user.id)
     .single()
 
   if (error || !ujian) {
@@ -33,7 +32,7 @@ export default async function EditUjianPage({ params }: { params: Promise<{ id: 
   }
 
   return (
-    <DashboardLayout user={{ nama: guru?.nama || "Guru", role: "guru" }}>
+    <DashboardLayout user={{ nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }}>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Edit Ujian</h1>
@@ -63,8 +62,8 @@ export default async function EditUjianPage({ params }: { params: Promise<{ id: 
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <UjianForm 
-                mode="edit" 
+              <UjianForm
+                mode="edit"
                 initialData={{
                   id: ujian.id,
                   judul: ujian.judul,

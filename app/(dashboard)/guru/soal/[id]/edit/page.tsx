@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState, use } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { redirect, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SoalForm } from '@/components/soal/SoalForm'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,39 +29,34 @@ export default function SoalEditPage({ params }: { params: Promise<{ id: string 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isloading, setIsloading] = useState(true)
   const [soal, setSoal] = useState<Soal | null>(null)
-  const [user, setUser] = useState<{ nama: string; role: string } | null>(null)
+  const [user, setUser] = useState<{ nama: string; username: string; role: string } | null>(null)
 
   useEffect(() => {
     const fetchSoal = async () => {
-      const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (!user) {
-        redirect('/login')
+      const meRes = await fetch('/api/auth/me', { credentials: 'include' })
+      if (!meRes.ok) { router.push('/login'); return }
+      const meData = await meRes.json()
+      if (!meData.success || meData.data.user.role !== 'guru') {
+        router.push('/login')
         return
       }
+      const user = meData.data.user
+      setUser({
+        nama: user.nama || 'Guru',
+        username: user.username,
+        role: 'guru'
+      })
 
-      const { data: guruData } = await supabase
-        .from('guru')
-        .select('nama')
-        .eq('id', user.id)
-        .single()
+      const soalRes = await fetch(`/api/guru/soal/${soalId}`, { credentials: 'include' })
+      const soalData = await soalRes.json()
 
-      setUser({ nama: guruData?.nama || 'Guru', role: 'guru' })
-
-      const { data: soalData, error } = await supabase
-        .from('soal')
-        .select('*')
-        .eq('id', soalId)
-        .single()
-
-      if (error || !soalData) {
+      if (!soalRes.ok || !soalData.success) {
         toast.error('Soal tidak ditemukan')
         router.push('/guru/soal')
         return
       }
 
-      setSoal(soalData)
+      setSoal(soalData.data)
       setIsloading(false)
     }
 
@@ -86,7 +80,8 @@ export default function SoalEditPage({ params }: { params: Promise<{ id: string 
       const response = await fetch(`/api/guru/soal/${soalId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        credentials: 'include'
       })
 
       const result = await response.json()

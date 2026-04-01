@@ -1,15 +1,10 @@
-import { createClient } from "@/lib/supabase/server"
+import { getSession } from "@/lib/auth/session"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { SoalTable } from "@/components/soal/SoalTable"
+import { UjianFilter } from "@/components/soal/UjianFilter"
 import { Button } from "@/components/ui/button"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 import Link from "next/link"
 import { Upload } from "lucide-react"
 
@@ -33,31 +28,29 @@ interface Ujian {
   status: 'aktif' | 'nonaktif'
 }
 
-async function fetchData(searchParamsProps: { ujian_id?: string }): Promise<{ 
+async function fetchData(searchParamsProps: { ujian_id?: string }): Promise<{
   soal: Soal[]
   ujian: Ujian[]
   selectedUjianId: string | null
   ujianStatus: 'aktif' | 'nonaktif'
-  user: { nama: string; role: string }
+  user: { nama: string; username: string; role: string }
 }> {
-  const supabase = await createClient()
+  const session = await getSession()
 
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
+  if (!session) {
     redirect("/login")
   }
 
-  const { data: guru } = await supabase
-    .from("guru")
-    .select("nama")
-    .eq("id", user.id)
-    .single()
+  if (session.user.role !== "guru") {
+    redirect("/login")
+  }
+
+  const supabase = createAdminClient()
 
   const { data: ujianList } = await supabase
     .from("ujian")
     .select("id, judul, kode_ujian, status")
-    .eq("created_by", user.id)
+    .eq("created_by", session.user.id)
     .order("created_at", { ascending: false })
 
   const selectedUjianId = searchParamsProps.ujian_id || null
@@ -80,7 +73,7 @@ async function fetchData(searchParamsProps: { ujian_id?: string }): Promise<{
       .from("ujian")
       .select("status")
       .eq("id", selectedUjianId)
-      .eq("created_by", user.id)
+      .eq("created_by", session.user.id)
       .single()
 
     if (ujianData) {
@@ -93,7 +86,7 @@ async function fetchData(searchParamsProps: { ujian_id?: string }): Promise<{
     ujian: ujianList || [],
     selectedUjianId,
     ujianStatus,
-    user: { nama: guru?.nama || "Guru", role: "guru" }
+    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
   }
 }
 
@@ -120,7 +113,7 @@ export default async function SoalListPage({ searchParams }: { searchParams: Pro
                 </Button>
               </Link>
             )}
-            <Link 
+            <Link
               href={selectedUjianId ? `/guru/soal/create?ujian_id=${selectedUjianId}` : "/guru/soal/create"}
             >
               <Button className="gap-2">
@@ -131,21 +124,7 @@ export default async function SoalListPage({ searchParams }: { searchParams: Pro
         </div>
 
         <div className="bg-white rounded-lg border border-gray-200 p-4 shadow-sm">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Filter Ujian</label>
-            <Select value={selectedUjianId || ""} defaultValue="">
-              <SelectTrigger className="w-full sm:w-[400px]">
-                <SelectValue placeholder="Pilih ujian..." />
-              </SelectTrigger>
-              <SelectContent>
-                {ujian.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.judul} ({u.kode_ujian}) - {u.status === 'aktif' ? 'Aktif' : 'Nonaktif'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <UjianFilter ujianList={ujian} selectedUjianId={selectedUjianId} />
         </div>
 
         {!selectedUjianId ? (
@@ -171,10 +150,9 @@ export default async function SoalListPage({ searchParams }: { searchParams: Pro
                 )}
               </div>
             </div>
-            <SoalTable 
-              data={soal} 
+            <SoalTable
+              data={soal}
               ujianStatus={ujianStatus}
-              onDelete={() => {}}
             />
           </div>
         )}

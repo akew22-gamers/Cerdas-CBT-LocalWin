@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -44,10 +44,12 @@ interface Hasil {
 
 interface User {
   nama: string
+  username: string
   role: string
 }
 
 export default function HasilListPage() {
+  const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [ujianList, setUjianList] = useState<Ujian[]>([])
   const [selectedUjian, setSelectedUjian] = useState<string>("")
@@ -67,33 +69,47 @@ export default function HasilListPage() {
   }, [selectedUjian])
 
   const fetchUserAndUjian = async () => {
-    const supabase = createClient()
+    try {
+      const [meRes, ujianRes] = await Promise.all([
+        fetch('/api/auth/me', { credentials: 'include' }),
+        fetch('/api/guru/ujian', { credentials: 'include' })
+      ])
 
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (!authUser) return
+      if (meRes.ok) {
+        const meData = await meRes.json()
+        if (meData.success && meData.data?.user) {
+          const sessionUser = meData.data.user
+          if (sessionUser.role !== 'guru') {
+            router.push('/login')
+            return
+          }
+          setUser({
+            nama: sessionUser.nama || 'Guru',
+            username: sessionUser.username,
+            role: 'guru'
+          })
+        }
+      }
 
-    const { data: guru } = await supabase
-      .from("guru")
-      .select("nama")
-      .eq("id", authUser.id)
-      .single()
+      if (ujianRes.ok) {
+        const ujianData = await ujianRes.json()
+        if (ujianData.success) {
+          setUjianList(ujianData.data?.ujian || [])
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch data:', error)
+    }
 
-    setUser({ nama: guru?.nama || "Guru", role: "guru" })
-
-    const { data: ujianData } = await supabase
-      .from("ujian")
-      .select("id, judul, kode_ujian, status")
-      .eq("created_by", authUser.id)
-      .order("created_at", { ascending: false })
-
-    setUjianList(ujianData || [])
     setLoading(false)
   }
 
   const fetchHasil = async (ujianId: string) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/guru/hasil?ujian_id=${ujianId}`)
+      const response = await fetch(`/api/guru/hasil?ujian_id=${ujianId}`, {
+        credentials: 'include'
+      })
       const result = await response.json()
       if (result.success) {
         setHasilList(result.data.hasil)
@@ -108,7 +124,9 @@ export default function HasilListPage() {
     if (!selectedUjian) return
     setExporting(true)
     try {
-      const response = await fetch(`/api/guru/hasil/${selectedUjian}/export?format=xlsx`)
+      const response = await fetch(`/api/guru/hasil/${selectedUjian}/export?format=xlsx`, {
+        credentials: 'include'
+      })
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
