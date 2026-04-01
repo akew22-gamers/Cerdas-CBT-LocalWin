@@ -43,7 +43,7 @@ interface Soal {
 interface SoalTableProps {
   data: Soal[]
   ujianStatus: 'aktif' | 'nonaktif'
-  onDelete: () => void
+  onDelete?: () => void
 }
 
 export function SoalTable({ data, ujianStatus, onDelete }: SoalTableProps) {
@@ -69,7 +69,7 @@ export function SoalTable({ data, ujianStatus, onDelete }: SoalTableProps) {
       }
 
       toast.success('Soal berhasil dihapus')
-      onDelete()
+      onDelete?.() || router.refresh()
     } catch (error) {
       console.error('Delete error:', error)
       toast.error('Terjadi kesalahan saat menghapus soal')
@@ -175,17 +175,19 @@ export function SoalTable({ data, ujianStatus, onDelete }: SoalTableProps) {
                       Edit
                     </Button>
                     <AlertDialog>
-                      <AlertDialogTrigger>
-                        <Button 
-                          variant="destructive" 
-                          size="sm" 
-                          className="gap-1"
-                          disabled={ujianStatus === 'aktif'}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Hapus
-                        </Button>
-                      </AlertDialogTrigger>
+                      <AlertDialogTrigger
+                        render={
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="gap-1"
+                            disabled={ujianStatus === 'aktif'}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Hapus
+                          </Button>
+                        }
+                      />
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Hapus Soal</AlertDialogTitle>
@@ -284,17 +286,19 @@ export function SoalTable({ data, ujianStatus, onDelete }: SoalTableProps) {
                 Edit
               </Button>
               <AlertDialog>
-                <AlertDialogTrigger>
-                  <Button 
-                    variant="destructive" 
-                    size="sm" 
-                    className="flex-1 gap-1"
-                    disabled={ujianStatus === 'aktif'}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Hapus
-                  </Button>
-                </AlertDialogTrigger>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1 gap-1"
+                      disabled={ujianStatus === 'aktif'}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Hapus
+                    </Button>
+                  }
+                />
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Hapus Soal</AlertDialogTitle>

@@ -43,7 +43,7 @@ const navigationConfig: Record<UserRole, NavSection[]> = {
       title: "Manajemen",
       items: [
         { label: "Guru Management", href: "/admin/guru", icon: <Users className="w-5 h-5" /> },
-        { label: "Audit Log", href: "/admin/audit", icon: <ClipboardList className="w-5 h-5" /> },
+        { label: "Audit Log", href: "/admin/audit-log", icon: <ClipboardList className="w-5 h-5" /> },
         { label: "School Identity", href: "/admin/sekolah", icon: <School className="w-5 h-5" /> },
       ],
     },

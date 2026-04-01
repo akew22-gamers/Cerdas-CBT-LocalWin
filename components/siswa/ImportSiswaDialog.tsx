@@ -50,7 +50,8 @@ export function ImportSiswaDialog() {
     try {
       const res = await fetch('/api/guru/siswa/import', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include'
       })
 
       const data = await res.json()

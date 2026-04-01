@@ -19,7 +19,9 @@ export function LiveSiswaCount({ ujianIds, onUpdate }: LiveSiswaCountProps) {
 
   const fetchCounts = async () => {
     try {
-      const response = await fetch('/api/guru/dashboard/realtime')
+      const response = await fetch('/api/guru/dashboard/realtime', {
+        credentials: 'include'
+      })
       const result = await response.json()
       
       if (result.success) {

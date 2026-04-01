@@ -51,6 +51,7 @@ export function UjianForm({ mode, initialData }: UjianFormProps) {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           judul: judul.trim(),
           durasi: durasiNum,

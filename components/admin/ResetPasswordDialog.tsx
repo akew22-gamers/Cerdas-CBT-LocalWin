@@ -60,11 +60,13 @@ export function ResetPasswordDialog({ guruId, guruNama, onPasswordReset }: Reset
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger>
-        <Button variant="outline" size="sm" title="Reset Password">
-          <KeyRound className="h-4 w-4" />
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="icon" title="Reset Password">
+            <KeyRound className="h-4 w-4" />
+          </Button>
+        }
+      />
       <DialogContent>
         <form onSubmit={handleReset}>
           <DialogHeader>

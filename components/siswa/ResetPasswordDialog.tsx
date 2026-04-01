@@ -59,11 +59,13 @@ export function ResetPasswordDialog({ siswaId, siswaNama, onPasswordReset }: Res
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger>
-        <Button variant="outline" size="sm">
-          Reset Password
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="outline" size="sm">
+            Reset Password
+          </Button>
+        }
+      />
       <DialogContent>
         <form onSubmit={handleReset}>
           <DialogHeader>

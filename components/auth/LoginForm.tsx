@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Eye, EyeOff, GraduationCap, School, Shield, User } from "lucide-react"
 
@@ -17,7 +16,6 @@ interface LoginFormProps {
 }
 
 export function LoginForm({ schoolName }: LoginFormProps) {
-  const router = useRouter()
   const [role, setRole] = useState<UserRole>("siswa")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -69,17 +67,17 @@ export function LoginForm({ schoolName }: LoginFormProps) {
       toast.success("Login berhasil!")
 
       const userRole = data.data.user.role
-      if (userRole === "siswa") {
-        router.push("/siswa")
-      } else if (userRole === "guru") {
-        router.push("/guru")
+      let redirectPath = "/siswa"
+      if (userRole === "guru") {
+        redirectPath = "/guru"
       } else if (userRole === "super_admin") {
-        router.push("/admin")
+        redirectPath = "/admin"
       }
+
+      window.location.href = redirectPath
     } catch (error) {
       const message = error instanceof Error ? error.message : "Terjadi kesalahan"
       toast.error(message)
-    } finally {
       setIsLoading(false)
     }
   }

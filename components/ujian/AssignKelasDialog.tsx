@@ -54,7 +54,9 @@ export function AssignKelasDialog({
   const fetchKelas = async () => {
     setIsFetching(true)
     try {
-      const response = await fetch("/api/guru/kelas")
+      const response = await fetch("/api/guru/kelas", {
+        credentials: 'include'
+      })
       const result = await response.json()
 
       if (result.success) {
@@ -92,6 +94,7 @@ export function AssignKelasDialog({
         body: JSON.stringify({
           kelas_ids: Array.from(selectedKelasIds),
         }),
+        credentials: 'include'
       })
 
       const result = await response.json()

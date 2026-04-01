@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Fragment } from 'react'
 import { AuditLog } from '@/types/database'
 import {
   Table,
@@ -110,9 +110,8 @@ export function AuditLogTable({ logs, loading }: AuditLogTableProps) {
         </TableHeader>
         <TableBody>
           {logs.map((log) => (
-            <>
+            <Fragment key={log.id}>
               <TableRow
-                key={log.id}
                 className={cn(
                   'cursor-pointer transition-colors',
                   expandedId === log.id && 'bg-muted/50'
@@ -174,7 +173,7 @@ export function AuditLogTable({ logs, loading }: AuditLogTableProps) {
                   </TableCell>
                 </TableRow>
               )}
-            </>
+            </Fragment>
           ))}
         </TableBody>
       </Table>

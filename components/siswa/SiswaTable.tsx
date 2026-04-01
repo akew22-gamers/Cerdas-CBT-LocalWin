@@ -37,7 +37,7 @@ interface Siswa {
 
 interface SiswaTableProps {
   siswaList: Siswa[]
-  onRefresh: () => void
+  onRefresh?: () => void
 }
 
 export function SiswaTable({ siswaList, onRefresh }: SiswaTableProps) {
@@ -72,7 +72,7 @@ export function SiswaTable({ siswaList, onRefresh }: SiswaTableProps) {
       }
 
       toast.success("Siswa berhasil dihapus")
-      onRefresh()
+      onRefresh?.() || router.refresh()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Gagal menghapus siswa"
       toast.error(errorMessage)
@@ -84,7 +84,7 @@ export function SiswaTable({ siswaList, onRefresh }: SiswaTableProps) {
   }
 
   const handlePasswordReset = () => {
-    onRefresh()
+    onRefresh?.() || router.refresh()
   }
 
   return (

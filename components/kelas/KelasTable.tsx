@@ -33,7 +33,7 @@ interface Kelas {
 
 interface KelasTableProps {
   data: Kelas[]
-  onDelete: () => void
+  onDelete?: () => void
 }
 
 export function KelasTable({ data, onDelete }: KelasTableProps) {
@@ -59,7 +59,7 @@ export function KelasTable({ data, onDelete }: KelasTableProps) {
       }
 
       toast.success("Kelas berhasil dihapus")
-      onDelete()
+      onDelete?.() || router.refresh()
     } catch (error) {
       console.error("Delete error:", error)
       toast.error("Terjadi kesalahan saat menghapus kelas")
@@ -110,13 +110,15 @@ export function KelasTable({ data, onDelete }: KelasTableProps) {
                       <Pencil className="h-4 w-4" />
                       Edit
                     </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger>
-                        <Button variant="destructive" size="sm" className="gap-1">
-                          <Trash2 className="h-4 w-4" />
-                          Hapus
-                        </Button>
-                      </AlertDialogTrigger>
+<AlertDialog>
+                      <AlertDialogTrigger
+                        render={
+                          <Button variant="destructive" size="sm" className="gap-1">
+                            <Trash2 className="h-4 w-4" />
+                            Hapus
+                          </Button>
+                        }
+                      />
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Hapus Kelas</AlertDialogTitle>

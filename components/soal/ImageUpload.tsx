@@ -39,7 +39,8 @@ export function ImageUpload({ value, onChange, className = '' }: ImageUploadProp
 
       const response = await fetch('/api/upload/image', {
         method: 'POST',
-        body: formData
+        body: formData,
+        credentials: 'include'
       })
 
       const result = await response.json()

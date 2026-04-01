@@ -44,8 +44,8 @@ interface Ujian {
 
 interface UjianTableProps {
   data: Ujian[]
-  onDelete: () => void
-  onToggle: () => void
+  onDelete?: () => void
+  onToggle?: () => void
 }
 
 export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
@@ -73,7 +73,7 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
       }
 
       toast.success(`Ujian "${judul}" berhasil di${newStatus === "aktif" ? "aktifkan" : "nonaktifkan"}`)
-      onToggle()
+      onToggle?.() || router.refresh()
     } catch (error) {
       console.error("Toggle error:", error)
       toast.error("Terjadi kesalahan saat mengubah status ujian")
@@ -119,7 +119,7 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
       }
 
       toast.success("Ujian berhasil dihapus")
-      onDelete()
+      onDelete?.() || router.refresh()
     } catch (error) {
       console.error("Delete error:", error)
       toast.error("Terjadi kesalahan saat menghapus ujian")
@@ -233,18 +233,20 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                       Duplikat
                     </Button>
                     <AlertDialog>
-                      <AlertDialogTrigger>
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="gap-1"
-                          disabled={ujian.status === "aktif"}
-                          title={ujian.status === "aktif" ? "Nonaktifkan ujian terlebih dahulu untuk hapus" : "Hapus"}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Hapus
-                        </Button>
-                      </AlertDialogTrigger>
+                      <AlertDialogTrigger
+                        render={
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="gap-1"
+                            disabled={ujian.status === "aktif"}
+                            title={ujian.status === "aktif" ? "Nonaktifkan ujian terlebih dahulu untuk hapus" : "Hapus"}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Hapus
+                          </Button>
+                        }
+                      />
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Hapus Ujian</AlertDialogTitle>
@@ -354,17 +356,19 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                 Duplikat
               </Button>
               <AlertDialog>
-                <AlertDialogTrigger>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    className="flex-1 gap-1 min-w-[45%]"
-                    disabled={ujian.status === "aktif"}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    Hapus
-                  </Button>
-                </AlertDialogTrigger>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      className="flex-1 gap-1 min-w-[45%]"
+                      disabled={ujian.status === "aktif"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Hapus
+                    </Button>
+                  }
+                />
                 <AlertDialogContent>
                   <AlertDialogHeader>
                     <AlertDialogTitle>Hapus Ujian</AlertDialogTitle>

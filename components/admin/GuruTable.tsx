@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { Pencil, Trash2, KeyRound } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import { ResetPasswordDialog } from "./ResetPasswordDialog"
 
 interface Guru {
@@ -34,7 +34,7 @@ interface Guru {
 
 interface GuruTableProps {
   guruList: Guru[]
-  onRefresh: () => void
+  onRefresh?: () => void
 }
 
 export function GuruTable({ guruList, onRefresh }: GuruTableProps) {
@@ -42,6 +42,14 @@ export function GuruTable({ guruList, onRefresh }: GuruTableProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [selectedGuru, setSelectedGuru] = React.useState<Guru | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
+
+  const handleRefresh = () => {
+    if (onRefresh) {
+      onRefresh()
+    } else {
+      router.refresh()
+    }
+  }
 
   const handleEdit = (guru: Guru) => {
     router.push(`/admin/guru/${guru.id}/edit`)
@@ -69,7 +77,7 @@ export function GuruTable({ guruList, onRefresh }: GuruTableProps) {
       }
 
       toast.success("Guru berhasil dihapus")
-      onRefresh()
+      handleRefresh()
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Gagal menghapus guru"
       toast.error(errorMessage)
@@ -81,7 +89,7 @@ export function GuruTable({ guruList, onRefresh }: GuruTableProps) {
   }
 
   const handlePasswordReset = () => {
-    onRefresh()
+    handleRefresh()
   }
 
   const formatDate = (dateString: string) => {

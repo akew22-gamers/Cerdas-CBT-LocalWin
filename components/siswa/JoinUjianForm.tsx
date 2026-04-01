@@ -36,6 +36,7 @@ export function JoinUjianForm({ open = true, onOpenChange }: JoinUjianFormProps)
           body: JSON.stringify({
             kode_ujian: kodeUjian.trim().toUpperCase(),
           }),
+          credentials: 'include'
         })
 
         const result = await response.json()
