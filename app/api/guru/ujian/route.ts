@@ -23,12 +23,7 @@ export async function GET(request: Request) {
 
     const supabase = createAdminClient()
 
-    // Get query params
-    const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-
-    // Build query
-    let query = supabase
+    const { data: ujianList, error } = await supabase
       .from('ujian')
       .select(`
         id,
@@ -43,13 +38,7 @@ export async function GET(request: Request) {
         soal_count:soal(count)
       `)
       .eq('created_by', session.user.id)
-
-    // Filter by status if provided
-    if (status && (status === 'aktif' || status === 'nonaktif')) {
-      query = query.eq('status', status)
-    }
-
-    const { data: ujianList, error } = await query.order('created_at', { ascending: false })
+      .order('created_at', { ascending: false })
 
     if (error) {
       console.error('Error fetching ujian:', error)
@@ -61,7 +50,6 @@ export async function GET(request: Request) {
 
     // Transform data
     const formattedUjian = ujianList.map((u: any) => {
-      // Extract unique kelas from ujian_kelas
       const kelasMap = new Map()
       u.ujian_kelas?.forEach((uk: any) => {
         if (uk.kelas) {

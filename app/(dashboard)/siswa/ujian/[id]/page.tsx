@@ -28,6 +28,11 @@ interface StatusData {
   fullscreen_exit_count: number
 }
 
+interface SiswaInfo {
+  nama: string
+  nisn: string
+}
+
 export default function ExamPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
   const router = useRouter()
@@ -40,6 +45,7 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showWarning, setShowWarning] = useState(false)
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false)
+  const [siswaInfo, setSiswaInfo] = useState<SiswaInfo | null>(null)
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -92,6 +98,24 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
   }, [resolvedParams.id, fetchSoal])
 
   useEffect(() => {
+    const fetchSiswaInfo = async () => {
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include' })
+        const data = await res.json()
+        if (data.success && data.data?.user) {
+          setSiswaInfo({
+            nama: data.data.user.nama || 'Siswa',
+            nisn: data.data.user.nisn || '-'
+          })
+        }
+      } catch (err) {
+        console.error('Error fetching siswa info:', err)
+      }
+    }
+    fetchSiswaInfo()
+  }, [])
+
+  useEffect(() => {
     startExam()
   }, [startExam])
 
@@ -111,6 +135,12 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
     const currentSoal = soalList.find((s) => s.questionNumber === currentQuestion)
     if (!currentSoal) return
 
+    setSoalList((prev) =>
+      prev.map((s) =>
+        s.questionNumber === currentQuestion ? { ...s, jawaban_siswa: jawaban } : s
+      )
+    )
+
     try {
       await fetch(`/api/siswa/ujian/${resolvedParams.id}/jawaban`, {
         method: 'POST',
@@ -121,14 +151,13 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
           urutan_soal: currentQuestion - 1
         })
       })
-
-      setSoalList((prev) =>
-        prev.map((s) =>
-          s.questionNumber === currentQuestion ? { ...s, jawaban_siswa: jawaban } : s
-        )
-      )
     } catch (err) {
       console.error('Error saving answer:', err)
+      setSoalList((prev) =>
+        prev.map((s) =>
+          s.questionNumber === currentQuestion ? { ...s, jawaban_siswa: currentSoal.jawaban_siswa } : s
+        )
+      )
     }
   }
 
@@ -239,6 +268,7 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
       progress={`${answeredQuestions.length}/${soalList.length}`}
       onSubmit={() => setShowConfirmSubmit(true)}
       onFullscreenExit={handleFullscreenExit}
+      siswaInfo={siswaInfo || undefined}
     >
       {showWarning && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">

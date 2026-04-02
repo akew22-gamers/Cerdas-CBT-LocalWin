@@ -6,6 +6,7 @@ import { SoalTable } from "@/components/soal/SoalTable"
 import { UjianFilter } from "@/components/soal/UjianFilter"
 import { SoalActions } from "@/components/soal/SoalActions"
 import { FileQuestion, AlertCircle } from "lucide-react"
+import { UjianStatusToggle } from "@/components/ujian/UjianStatusToggle"
 
 interface Soal {
   id: string
@@ -140,20 +141,23 @@ export default async function SoalListPage({ searchParams }: { searchParams: Pro
                     {ujian.find(u => u.id === selectedUjianId)?.judul}
                   </h3>
                   <p className="text-sm text-slate-500 mt-0.5">
-                    {soal.length} soal • Status: 
-                    <span className={ujianStatus === 'aktif' ? 'text-emerald-600 font-medium ml-1' : 'text-slate-600 ml-1'}>
-                      {ujianStatus === 'aktif' ? 'Aktif' : 'Nonaktif'}
-                    </span>
+                    {soal.length} soal
                   </p>
                 </div>
-                {ujianStatus === 'aktif' && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
-                    <AlertCircle className="w-4 h-4 text-amber-600" />
-                    <span className="text-xs font-medium text-amber-700">
-                      Edit & hapus dinonaktifkan
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-4">
+                  <UjianStatusToggle 
+                    ujianId={selectedUjianId} 
+                    currentStatus={ujianStatus} 
+                  />
+                  {ujianStatus === 'aktif' && (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
+                      <AlertCircle className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-medium text-amber-700">
+                        Edit & hapus dinonaktifkan
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             <SoalTable
