@@ -25,6 +25,7 @@ import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { EditUjianDialog } from "./EditUjianDialog"
 import { DetailUjianDialog } from "./DetailUjianDialog"
+import { AssignKelasDialog } from "./AssignKelasDialog"
 
 interface Kelas {
   id: string
@@ -193,6 +194,11 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <DetailUjianDialog ujian={ujian} />
+                    <AssignKelasDialog
+                      ujianId={ujian.id}
+                      initialKelas={ujian.kelas}
+                      onAssignSuccess={() => router.refresh()}
+                    />
                     <EditUjianDialog ujian={ujian} onUpdated={onDelete || onToggle} />
                     <Button
                       variant="outline"
@@ -299,6 +305,11 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
             </div>
             <div className="flex flex-wrap gap-2 pt-3 border-t border-gray-100">
               <DetailUjianDialog ujian={ujian} />
+              <AssignKelasDialog
+                ujianId={ujian.id}
+                initialKelas={ujian.kelas}
+                onAssignSuccess={() => router.refresh()}
+              />
               <EditUjianDialog ujian={ujian} onUpdated={onDelete || onToggle} />
               <Button
                 variant="outline"
