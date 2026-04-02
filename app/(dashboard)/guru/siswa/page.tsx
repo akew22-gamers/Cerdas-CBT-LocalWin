@@ -4,8 +4,9 @@ import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SiswaTable } from '@/components/siswa/SiswaTable'
 import { AddSiswaDialog } from '@/components/siswa/AddSiswaDialog'
+import { ImportSiswaDialog } from '@/components/siswa/ImportSiswaDialog'
 import { Button } from '@/components/ui/button'
-import { Plus, Upload, Users, Filter } from 'lucide-react'
+import { Plus, Users, Filter } from 'lucide-react'
 import { KelasFilter } from '@/components/siswa/KelasFilter'
 
 interface Kelas {
@@ -87,10 +88,7 @@ export default async function SiswaListPage({
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 hover:bg-slate-50">
-              <Upload className="h-4 w-4" />
-              Import Excel
-            </Button>
+            <ImportSiswaDialog onSuccess={() => {}} />
             <AddSiswaDialog />
           </div>
         </div>

@@ -9,6 +9,7 @@ import { CheckCircle, TrendingUp, AlertCircle } from "lucide-react"
 
 interface DashboardData {
   siswa_nama: string
+  siswa_nisn: string
   total_ujian_selesai: number
   rata_rata_nilai: number
   available_ujian: Array<{
@@ -41,6 +42,7 @@ async function getDashboardData(siswaId: string): Promise<DashboardData> {
   if (!siswa) {
     return {
       siswa_nama: "Siswa",
+      siswa_nisn: "",
       total_ujian_selesai: 0,
       rata_rata_nilai: 0,
       available_ujian: [],
@@ -119,6 +121,7 @@ async function getDashboardData(siswaId: string): Promise<DashboardData> {
 
   return {
     siswa_nama: siswa.nama,
+    siswa_nisn: siswa.nisn || "",
     total_ujian_selesai: totalUjianSelesai,
     rata_rata_nilai: rataRataNilai,
     available_ujian: formattedAvailableUjian,
@@ -154,6 +157,9 @@ export default async function SiswaDashboardPage() {
           <p className="text-gray-500 text-sm mt-1">
             Selamat datang, {data.siswa_nama}
           </p>
+          {data.siswa_nisn && (
+            <p className="text-gray-400 text-sm">NISN: {data.siswa_nisn}</p>
+          )}
         </div>
 
         {/* Stats Cards */}

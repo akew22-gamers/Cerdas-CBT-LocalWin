@@ -39,6 +39,8 @@ interface Hasil {
   waktu_mulai: string
   waktu_selesai: string
   is_submitted: boolean
+  tab_switch_count: number
+  fullscreen_exit_count: number
 }
 
 interface User {
@@ -248,6 +250,8 @@ export default function HasilListPage() {
                         <TableHead>Kelas</TableHead>
                         <TableHead>Nilai</TableHead>
                         <TableHead>Waktu Selesai</TableHead>
+                        <TableHead>Ganti Tab</TableHead>
+                        <TableHead>Keluar Fullscreen</TableHead>
                         <TableHead>Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -271,6 +275,24 @@ export default function HasilListPage() {
                             {hasil.waktu_selesai
                               ? new Date(hasil.waktu_selesai).toLocaleString('id-ID')
                               : '-'}
+                          </TableCell>
+                          <TableCell>
+                            {hasil.tab_switch_count > 0 ? (
+                              <Badge variant="destructive" className="bg-orange-100 text-orange-800 hover:bg-orange-100">
+                                {hasil.tab_switch_count}
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {hasil.fullscreen_exit_count > 0 ? (
+                              <Badge variant="destructive" className="bg-red-100 text-red-800 hover:bg-red-100">
+                                {hasil.fullscreen_exit_count}
+                              </Badge>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             {hasil.is_submitted ? (

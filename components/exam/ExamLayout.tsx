@@ -34,15 +34,19 @@ export function ExamLayout({
         await elem.requestFullscreen()
         setIsFullscreen(true)
       }
-      setExamStarted(true)
-      
-      if ('wakeLock' in navigator) {
-        const lock = await navigator.wakeLock.request('screen')
-        setWakeLock(lock)
-      }
     } catch (err) {
       console.error('Fullscreen error:', err)
-      setExamStarted(true)
+    }
+    
+    setExamStarted(true)
+    
+    if ('wakeLock' in navigator) {
+      try {
+        const lock = await navigator.wakeLock.request('screen')
+        setWakeLock(lock)
+      } catch (err) {
+        console.error('Wake lock error:', err)
+      }
     }
   }, [])
 

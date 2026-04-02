@@ -43,19 +43,35 @@ export async function GET(
     }
 
     const { data: hasil } = await supabase
-      .from('v_rekap_nilai')
-      .select('*')
+      .from('hasil_ujian')
+      .select(`
+        id,
+        nilai,
+        jumlah_benar,
+        jumlah_salah,
+        waktu_mulai,
+        waktu_selesai,
+        is_submitted,
+        siswa:siswa_id (
+          id,
+          nisn,
+          nama,
+          kelas:kelas_id (
+            nama_kelas
+          )
+        )
+      `)
       .eq('ujian_id', ujian_id)
       .order('waktu_selesai', { ascending: false })
 
     const exportData = (hasil || []).map((h: any, index: number) => ({
       No: index + 1,
-      NISN: h.nisn,
-      'Nama Siswa': h.siswa_nama,
-      Kelas: h.nama_kelas,
-      Nilai: parseFloat(h.nilai),
-      'Jumlah Benar': h.jumlah_benar,
-      'Jumlah Salah': h.jumlah_salah,
+      NISN: h.siswa?.nisn || '',
+      'Nama Siswa': h.siswa?.nama || '',
+      Kelas: h.siswa?.kelas?.nama_kelas || '-',
+      Nilai: parseFloat(h.nilai) || 0,
+      'Jumlah Benar': h.jumlah_benar || 0,
+      'Jumlah Salah': h.jumlah_salah || 0,
       'Waktu Mulai': h.waktu_mulai ? new Date(h.waktu_mulai).toLocaleString('id-ID') : '-',
       'Waktu Selesai': h.waktu_selesai ? new Date(h.waktu_selesai).toLocaleString('id-ID') : '-',
       Status: h.is_submitted ? 'Selesai' : 'Belum Selesai'
