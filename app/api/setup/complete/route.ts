@@ -6,19 +6,6 @@ import type { SetupCompleteRequest } from '@/types/api'
 
 export async function POST(request: Request) {
   try {
-    const setupToken = request.headers.get('X-Setup-Token')
-    const expectedToken = process.env.SETUP_TOKEN
-
-    if (!setupToken || setupToken !== expectedToken) {
-      return NextResponse.json<ApiErrorResponse>({
-        success: false,
-        error: {
-          code: 'INVALID_SETUP_TOKEN',
-          message: 'Token setup tidak valid'
-        }
-      }, { status: 401 })
-    }
-
     const body = await request.json() as SetupCompleteRequest
     const { super_admin, sekolah } = body
 

@@ -1,21 +1,13 @@
 import { NextResponse } from 'next/server'
 import type { ApiSuccessResponse, ApiErrorResponse } from '@/types/api'
 
-export async function GET(request: Request) {
+/**
+ * @deprecated Setup token validation is no longer required.
+ * This endpoint is kept for backward compatibility only.
+ */
+export async function GET() {
   try {
-    const setupToken = request.headers.get('X-Setup-Token')
-    const expectedToken = process.env.SETUP_TOKEN
-
-    if (!setupToken || setupToken !== expectedToken) {
-      return NextResponse.json<ApiErrorResponse>({
-        success: false,
-        error: {
-          code: 'INVALID_SETUP_TOKEN',
-          message: 'Token setup tidak valid'
-        }
-      }, { status: 401 })
-    }
-
+    // Token validation is deprecated - always return valid for backward compatibility
     return NextResponse.json<ApiSuccessResponse<{ token_valid: boolean }>>({
       success: true,
       data: { token_valid: true }
