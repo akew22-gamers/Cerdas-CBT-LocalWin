@@ -48,7 +48,7 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
       if (data.success) {
         setStatus(data.data)
         if (data.data.is_finished || data.data.is_submitted) {
-          router.push(`/siswa/hasil/${resolvedParams.id}`)
+          router.push(`/siswa/ujian/${resolvedParams.id}/hasil`)
         }
       }
     } catch (err) {
@@ -141,7 +141,7 @@ export default function ExamPage({ params }: { params: Promise<{ id: string }> }
       const data = await res.json()
       
       if (data.success) {
-        router.push(`/siswa/hasil/${resolvedParams.id}`)
+        router.push(`/siswa/ujian/${resolvedParams.id}/hasil`)
       } else {
         setError(data.error?.message || 'Gagal mengumpulkan jawaban')
         setShowConfirmSubmit(false)
