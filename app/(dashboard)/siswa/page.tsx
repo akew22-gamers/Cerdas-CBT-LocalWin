@@ -59,25 +59,29 @@ async function getDashboardData(siswaId: string): Promise<DashboardData> {
     ? Math.round(hasilData.reduce((sum, h) => sum + Number(h.nilai), 0) / totalUjianSelesai)
     : 0
 
+  const { data: ujianKelas } = await supabase
+    .from('ujian_kelas')
+    .select('ujian_id')
+    .eq('kelas_id', siswa.kelas_id)
+
+  const ujianIds = (ujianKelas || []).map(uk => uk.ujian_id)
+
   const { data: availableUjian } = await supabase
     .from('ujian')
-    .select(`
-      id,
-      kode_ujian,
-      judul,
-      durasi,
-      show_result,
-      ujian_kelas!inner(
-        kelas_id
-      )
-    `)
-    .eq('ujian_kelas.kelas_id', siswa.kelas_id)
+    .select('id, kode_ujian, judul, durasi, show_result')
+    .in('id', ujianIds)
     .eq('status', 'aktif')
-    .not('id', 'in', `(
-      select ujian_id from hasil_ujian where siswa_id = '${siswaId}'
-    )`)
 
-  const formattedAvailableUjian = (availableUjian || []).map((u: any) => ({
+  const { data: completedUjian } = await supabase
+    .from('hasil_ujian')
+    .select('ujian_id')
+    .eq('siswa_id', siswaId)
+    .eq('is_submitted', true)
+
+  const completedIds = (completedUjian || []).map(h => h.ujian_id)
+  const filteredUjian = (availableUjian || []).filter(u => !completedIds.includes(u.id))
+
+  const formattedAvailableUjian = filteredUjian.map((u: any) => ({
     id: u.id,
     kode_ujian: u.kode_ujian,
     judul: u.judul,

@@ -9,35 +9,43 @@ import { BookOpen, AlertCircle } from "lucide-react"
 async function getAvailableUjian(siswaId: string) {
   const supabase = createAdminClient()
 
-  const { data: siswa } = await supabase
+  const { data: siswa, error: siswaError } = await supabase
     .from('siswa')
     .select('id, kelas_id')
     .eq('id', siswaId)
     .single()
 
-  if (!siswa) {
+  if (siswaError || !siswa) {
+    return []
+  }
+
+  const { data: ujianKelas } = await supabase
+    .from('ujian_kelas')
+    .select('ujian_id')
+    .eq('kelas_id', siswa.kelas_id)
+
+  const ujianIds = (ujianKelas || []).map(uk => uk.ujian_id)
+
+  if (ujianIds.length === 0) {
     return []
   }
 
   const { data: availableUjian } = await supabase
     .from('ujian')
-    .select(`
-      id,
-      kode_ujian,
-      judul,
-      durasi,
-      show_result,
-      ujian_kelas!inner(
-        kelas_id
-      )
-    `)
-    .eq('ujian_kelas.kelas_id', siswa.kelas_id)
+    .select('id, kode_ujian, judul, durasi, show_result')
+    .in('id', ujianIds)
     .eq('status', 'aktif')
-    .not('id', 'in', `(
-      select ujian_id from hasil_ujian where siswa_id = '${siswaId}'
-    )`)
 
-  return (availableUjian || []).map((u: any) => ({
+  const { data: completedUjian } = await supabase
+    .from('hasil_ujian')
+    .select('ujian_id')
+    .eq('siswa_id', siswaId)
+    .eq('is_submitted', true)
+
+  const completedIds = (completedUjian || []).map(h => h.ujian_id)
+  const filteredUjian = (availableUjian || []).filter(u => !completedIds.includes(u.id))
+
+  return filteredUjian.map((u: any) => ({
     id: u.id,
     kode_ujian: u.kode_ujian,
     judul: u.judul,
