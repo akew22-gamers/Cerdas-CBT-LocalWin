@@ -23,18 +23,36 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const ujian_id = searchParams.get('ujian_id')
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
-    const offset = (page - 1) * limit
 
-    let query = supabase
-      .from('v_rekap_nilai')
-      .select('*')
+    if (!ujian_id) {
+      return NextResponse.json(
+        { success: false, error: { code: 'VALIDATION_ERROR', message: 'ujian_id diperlukan' } },
+        { status: 400 }
+      )
+    }
+
+    const { data: hasil, error } = await supabase
+      .from('hasil_ujian')
+      .select(`
+        id,
+        nilai,
+        jumlah_benar,
+        jumlah_salah,
+        waktu_mulai,
+        waktu_selesai,
+        is_submitted,
+        tab_switch_count,
+        fullscreen_exit_count,
+        siswa:siswa_id (
+          id,
+          nisn,
+          nama,
+          kelas:kelas_id (
+            nama_kelas
+          )
+        )
+      `)
       .eq('ujian_id', ujian_id)
-
-    const { data: hasil, error } = await query
-      .order('waktu_selesai', { ascending: false })
-      .range(offset, offset + limit - 1)
 
     if (error) {
       console.error('Error fetching hasil:', error)
@@ -44,39 +62,28 @@ export async function GET(request: Request) {
       )
     }
 
-    const { count } = await supabase
-      .from('v_rekap_nilai')
-      .select('*', { count: 'exact', head: true })
-      .eq('ujian_id', ujian_id)
-
     const formattedHasil = (hasil || []).map((h: any) => ({
       id: h.id,
       siswa: {
-        id: h.siswa_id,
-        nisn: h.nisn,
-        nama: h.siswa_nama
+        id: h.siswa?.id || '',
+        nisn: h.siswa?.nisn || '',
+        nama: h.siswa?.nama || ''
       },
-      kelas: h.nama_kelas,
-      nilai: parseFloat(h.nilai),
-      jumlah_benar: h.jumlah_benar,
-      jumlah_salah: h.jumlah_salah,
+      kelas: h.siswa?.kelas?.nama_kelas || '-',
+      nilai: parseFloat(h.nilai) || 0,
+      jumlah_benar: h.jumlah_benar || 0,
+      jumlah_salah: h.jumlah_salah || 0,
       waktu_mulai: h.waktu_mulai,
       waktu_selesai: h.waktu_selesai,
       is_submitted: h.is_submitted,
-      tab_switch_count: h.tab_switch_count,
-      fullscreen_exit_count: h.fullscreen_exit_count
+      tab_switch_count: h.tab_switch_count || 0,
+      fullscreen_exit_count: h.fullscreen_exit_count || 0
     }))
 
     return NextResponse.json({
       success: true,
       data: {
-        hasil: formattedHasil,
-        pagination: {
-          page,
-          limit,
-          total: count || 0,
-          total_pages: Math.ceil((count || 0) / limit)
-        }
+        hasil: formattedHasil
       }
     })
 

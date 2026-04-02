@@ -16,8 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { FileDown, Search, Eye, FileText, Loader2 } from "lucide-react"
-import Link from "next/link"
+import { FileDown, Search, FileText, Loader2 } from "lucide-react"
 
 interface Ujian {
   id: string
@@ -53,6 +52,7 @@ export default function HasilListPage() {
   const [user, setUser] = useState<User | null>(null)
   const [ujianList, setUjianList] = useState<Ujian[]>([])
   const [selectedUjian, setSelectedUjian] = useState<string>("")
+  const [selectedUjianName, setSelectedUjianName] = useState<string>("")
   const [hasilList, setHasilList] = useState<Hasil[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(true)
@@ -120,6 +120,13 @@ export default function HasilListPage() {
     setLoading(false)
   }
 
+  const handleUjianChange = (value: string | null) => {
+    const val = value || ""
+    setSelectedUjian(val)
+    const ujian = ujianList.find(u => u.id === val)
+    setSelectedUjianName(ujian ? `${ujian.judul} (${ujian.kode_ujian})` : "")
+  }
+
   const handleExport = async () => {
     if (!selectedUjian) return
     setExporting(true)
@@ -177,9 +184,11 @@ export default function HasilListPage() {
           </CardHeader>
           <CardContent>
             <div className="flex flex-col sm:flex-row gap-4">
-              <Select value={selectedUjian} onValueChange={(value) => setSelectedUjian(value || "")}>
+              <Select value={selectedUjian} onValueChange={handleUjianChange}>
                 <SelectTrigger className="w-full sm:w-[400px]">
-                  <SelectValue placeholder="Pilih ujian..." />
+                  <SelectValue placeholder="Pilih ujian...">
+                    {selectedUjianName || "Pilih ujian..."}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {ujianList.map((ujian) => (
@@ -212,7 +221,7 @@ export default function HasilListPage() {
         {selectedUjian && (
           <Card>
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <CardTitle>Daftar Hasil</CardTitle>
+              <CardTitle>Daftar Hasil ({hasilList.length} siswa)</CardTitle>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <Input
@@ -240,7 +249,6 @@ export default function HasilListPage() {
                         <TableHead>Nilai</TableHead>
                         <TableHead>Waktu Selesai</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Aksi</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -274,14 +282,6 @@ export default function HasilListPage() {
                                 Belum Selesai
                               </Badge>
                             )}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Link href={`/guru/hasil/${selectedUjian}`}>
-                              <Button variant="ghost" size="sm" className="gap-1">
-                                <Eye className="w-4 h-4" />
-                                Detail
-                              </Button>
-                            </Link>
                           </TableCell>
                         </TableRow>
                       ))}

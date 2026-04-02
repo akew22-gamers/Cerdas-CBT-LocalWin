@@ -5,15 +5,8 @@ import { DashboardLayout } from '@/components/layout'
 import { SiswaTable } from '@/components/siswa/SiswaTable'
 import { AddSiswaDialog } from '@/components/siswa/AddSiswaDialog'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { Plus, Upload, GraduationCap, Users, Filter } from 'lucide-react'
-import Link from 'next/link'
+import { Plus, Upload, Users, Filter } from 'lucide-react'
+import { KelasFilter } from '@/components/siswa/KelasFilter'
 
 interface Kelas {
   id: string
@@ -36,7 +29,8 @@ export default async function SiswaListPage({
   searchParams: Promise<{ kelas_id?: string }>
 }) {
   const session = await getSession()
-  const { kelas_id } = await searchParams
+  const resolvedParams = await searchParams
+  const kelas_id = resolvedParams.kelas_id
 
   if (!session) {
     redirect('/login')
@@ -71,6 +65,8 @@ export default async function SiswaListPage({
 
   const { data: siswaList } = await query.order('nama', { ascending: true })
 
+  const selectedKelas = kelas_id ? kelasList?.find(k => k.id === kelas_id) : null
+
   return (
     <DashboardLayout
       user={{
@@ -102,19 +98,11 @@ export default async function SiswaListPage({
         <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-slate-200/80 shadow-sm">
           <Filter className="w-4 h-4 text-slate-400" />
           <span className="text-sm font-medium text-slate-600">Filter:</span>
-          <Select defaultValue={kelas_id || ""}>
-            <SelectTrigger className="w-[220px] bg-slate-50 border-slate-200">
-              <SelectValue placeholder="Pilih kelas" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">Semua Kelas</SelectItem>
-              {kelasList?.map((kelas) => (
-                <SelectItem key={kelas.id} value={kelas.id}>
-                  {kelas.nama_kelas}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <KelasFilter 
+            kelasList={kelasList || []} 
+            selectedKelasId={kelas_id || null}
+            selectedKelasName={selectedKelas?.nama_kelas || null}
+          />
         </div>
 
         <SiswaTable
