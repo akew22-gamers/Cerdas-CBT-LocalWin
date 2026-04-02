@@ -14,7 +14,7 @@ interface HasilData {
   jumlah_salah: number
   is_submitted: boolean
   waktu_mulai: string
-  selesai_dikerjakan: string
+  waktu_selesai: string
   tab_switch_count: number
   fullscreen_exit_count: number
   show_result: boolean
@@ -158,8 +158,8 @@ export default function HasilUjianPage() {
 
             <div className="text-sm text-gray-500 text-center space-y-1">
               <p>Waktu Mulai: {new Date(hasil.waktu_mulai).toLocaleString('id-ID')}</p>
-              {hasil.selesai_dikerjakan && (
-                <p>Selesai: {new Date(hasil.selesai_dikerjakan).toLocaleString('id-ID')}</p>
+              {hasil.waktu_selesai && (
+                <p>Selesai: {new Date(hasil.waktu_selesai).toLocaleString('id-ID')}</p>
               )}
             </div>
           </CardContent>

@@ -130,7 +130,7 @@ export async function POST(
           jumlah_benar: jumlahBenar,
           jumlah_salah: jumlahSalah,
           is_submitted: true,
-          selesai_dikerjakan: now
+          waktu_selesai: now
         })
         .eq('id', existingHasil.id)
 
@@ -157,7 +157,7 @@ export async function POST(
             jumlah_benar: jumlahBenar,
             jumlah_salah: jumlahSalah,
             is_submitted: true,
-            selesai_dikerjakan: now
+            waktu_selesai: now
           })
           .eq('id', pendingHasil.id)
 
@@ -182,7 +182,7 @@ export async function POST(
             jumlah_salah: jumlahSalah,
             is_submitted: true,
             waktu_mulai: now,
-            selesai_dikerjakan: now,
+            waktu_selesai: now,
             seed_soal: seedSoal,
             seed_opsi: seedOpsi
           })

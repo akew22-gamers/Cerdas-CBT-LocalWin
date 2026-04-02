@@ -36,7 +36,7 @@ export async function GET(
         jumlah_salah,
         is_submitted,
         waktu_mulai,
-        selesai_dikerjakan,
+waktu_selesai,
         tab_switch_count,
         fullscreen_exit_count,
         ujian:ujian!inner(id, judul, show_result, durasi)
@@ -72,7 +72,7 @@ export async function GET(
         jumlah_salah: hasil.jumlah_salah,
         is_submitted: hasil.is_submitted,
         waktu_mulai: hasil.waktu_mulai,
-        selesai_dikerjakan: hasil.selesai_dikerjakan,
+        waktu_selesai: hasil.waktu_selesai,
         tab_switch_count: hasil.tab_switch_count,
         fullscreen_exit_count: hasil.fullscreen_exit_count,
         show_result: showResult,

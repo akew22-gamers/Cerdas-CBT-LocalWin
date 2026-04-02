@@ -19,22 +19,23 @@ export function ExamLayout({
   onFullscreenExit
 }: ExamLayoutProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(true)
+
+  const enterFullscreen = async () => {
+    try {
+      const elem = document.documentElement
+      if (!document.fullscreenElement) {
+        await elem.requestFullscreen()
+        setIsFullscreen(true)
+        setShowFullscreenPrompt(false)
+      }
+    } catch (err) {
+      console.error('Fullscreen error:', err)
+      setShowFullscreenPrompt(false)
+    }
+  }
 
   useEffect(() => {
-    const enterFullscreen = async () => {
-      try {
-        const elem = document.documentElement
-        if (!document.fullscreenElement) {
-          await elem.requestFullscreen()
-          setIsFullscreen(true)
-        }
-      } catch (err) {
-        console.error('Fullscreen error:', err)
-      }
-    }
-
-    enterFullscreen()
-
     const handleFullscreenChange = () => {
       const wasFullscreen = isFullscreen
       setIsFullscreen(!!document.fullscreenElement)
@@ -45,7 +46,7 @@ export function ExamLayout({
 
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
-  }, [onFullscreenExit])
+  }, [isFullscreen, onFullscreenExit])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -86,6 +87,30 @@ export function ExamLayout({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {showFullscreenPrompt && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 text-center">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Mode Fullscreen</h2>
+            <p className="text-gray-600 mb-6">
+              Untuk keamanan ujian, silakan masuk ke mode fullscreen. 
+              Keluar dari fullscreen akan tercatat sebagai pelanggaran.
+            </p>
+            <button
+              onClick={enterFullscreen}
+              className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+            >
+              Masuk Fullscreen
+            </button>
+            <button
+              onClick={() => setShowFullscreenPrompt(false)}
+              className="w-full mt-3 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50"
+            >
+              Lanjutkan Tanpa Fullscreen
+            </button>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
