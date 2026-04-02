@@ -250,10 +250,10 @@ export function GuruDashboardClient({ initialData, ujianIds, user }: GuruDashboa
                 Tambah Siswa Baru
               </Button>
             </Link>
-            <Link href="/guru/ujian/create">
+            <Link href="/guru/ujian">
               <Button variant="outline" className="w-full justify-start gap-2">
-                <Plus className="w-4 h-4" />
-                Buat Ujian Baru
+                <FileText className="w-4 h-4" />
+                Kelola Ujian
               </Button>
             </Link>
             <Link href="/guru/hasil">
