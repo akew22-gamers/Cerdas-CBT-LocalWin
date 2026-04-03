@@ -3,9 +3,11 @@ import { getSession } from '@/lib/auth/session'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DashboardLayout } from '@/components/layout'
 import { SekolahForm } from '@/components/sekolah/SekolahForm'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SekolahDisplay } from '@/components/sekolah/SekolahDisplay'
+import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
+import { School, Edit3, Eye } from 'lucide-react'
 
 export default async function AdminSekolahPage() {
   const session = await getSession()
@@ -37,51 +39,84 @@ export default async function AdminSekolahPage() {
         role: 'super_admin'
       }}
     >
-      <div className="space-y-6">
-        <div className="flex flex-col gap-2">
-          <div className="relative">
-            <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl blur-xl opacity-20" />
-            <h1 className="relative text-4xl font-bold bg-gradient-to-r from-violet-600 to-purple-700 bg-clip-text text-transparent">
-              Identitas Sekolah
-            </h1>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30">
+        <div className="max-w-6xl mx-auto space-y-8 p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl blur-lg opacity-40" />
+                <div className="relative h-14 w-14 flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-xl shadow-violet-500/25">
+                  <School className="h-7 w-7 text-white" />
+                </div>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+                  Identitas Sekolah
+                </h1>
+                <p className="text-slate-500 mt-1">
+                  Kelola informasi dan identitas sekolah Anda
+                </p>
+              </div>
+            </div>
+            {sekolah?.npsn && (
+              <Badge variant="secondary" className="self-start sm:self-auto px-4 py-2 bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 mr-2 animate-pulse" />
+                Terdaftar
+              </Badge>
+            )}
           </div>
-          <p className="text-gray-600 mt-2">Kelola informasi sekolah</p>
-        </div>
 
-        <Tabs defaultValue="edit" className="space-y-4">
-          <TabsList className="grid w-full md:w-auto grid-cols-2 bg-slate-100/50 p-1 rounded-xl">
-            <TabsTrigger value="edit" className="data-[state=active]:bg-white data-[state=active]:shadow-md">Edit Data</TabsTrigger>
-            <TabsTrigger value="preview" className="data-[state=active]:bg-white data-[state=active]:shadow-md">Preview</TabsTrigger>
-          </TabsList>
+          <Tabs defaultValue="preview" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <TabsList className="bg-white/80 backdrop-blur-sm border border-slate-200/60 shadow-sm p-1 rounded-xl">
+                <TabsTrigger 
+                  value="preview" 
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg px-6"
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="edit" 
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg px-6"
+                >
+                  <Edit3 className="h-4 w-4 mr-2" />
+                  Edit Data
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-          <TabsContent value="edit" className="space-y-4">
-            <Card className="border-slate-200/80 shadow-lg shadow-slate-200/50">
-              <CardHeader className="border-b border-slate-100">
-                <CardTitle className="text-xl">Form Identitas Sekolah</CardTitle>
-                <CardDescription className="text-slate-500">
-                  Lengkapi informasi sekolah Anda. Field bertanda * wajib diisi.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <SekolahForm initialData={sekolah || undefined} />
-              </CardContent>
-            </Card>
-          </TabsContent>
+            <TabsContent value="preview" className="space-y-6 mt-0">
+              {sekolah ? (
+                <SekolahDisplay data={sekolah} />
+              ) : (
+                <Card className="border-slate-200/60 bg-white/80 backdrop-blur-sm shadow-xl shadow-slate-200/40">
+                  <CardContent className="py-16">
+                    <div className="text-center space-y-4">
+                      <div className="mx-auto h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center">
+                        <School className="h-10 w-10 text-slate-400" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-medium text-slate-900">Belum ada data sekolah</p>
+                        <p className="text-slate-500 mt-1">
+                          Silakan lengkapi informasi sekolah pada tab "Edit Data"
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
 
-          <TabsContent value="preview" className="space-y-4">
-            {sekolah ? (
-              <SekolahDisplay data={sekolah} />
-            ) : (
-              <Card className="border-slate-200/80 shadow-lg shadow-slate-200/50">
-                <CardContent className="pt-6">
-                  <p className="text-center text-gray-500 dark:text-gray-400">
-                    Belum ada data sekolah untuk ditampilkan. Silakan isi form pada tab &quot;Edit Data&quot;.
-                  </p>
+            <TabsContent value="edit" className="space-y-6 mt-0">
+              <Card className="border-slate-200/60 bg-white/80 backdrop-blur-sm shadow-xl shadow-slate-200/40">
+                <CardContent className="pt-8">
+                  <SekolahForm initialData={sekolah || undefined} />
                 </CardContent>
               </Card>
-            )}
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </DashboardLayout>
   )

@@ -7,7 +7,20 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { School, Building2, Phone, Mail, Globe, MapPin, User } from "lucide-react"
+import { 
+  School, 
+  Building2, 
+  Phone, 
+  Mail, 
+  Globe, 
+  MapPin, 
+  User, 
+  Calendar,
+  ImagePlus,
+  Save,
+  RotateCcw,
+  Sparkles
+} from "lucide-react"
 
 interface SekolahFormData {
   nama_sekolah?: string
@@ -80,189 +93,151 @@ export function SekolahForm({ initialData, readOnly = false, apiEndpoint = "/api
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="relative mb-8">
-        <div className="absolute inset-0 bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl blur-xl opacity-20" />
-        <div className="relative flex items-center gap-3">
-          <div className="h-12 w-12 flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl shadow-lg shadow-violet-500/30">
-            <School className="h-6 w-6 text-white" />
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl blur-lg opacity-40" />
+          <div className="relative h-14 w-14 flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-xl shadow-violet-500/25">
+            <Sparkles className="h-7 w-7 text-white" />
           </div>
-          <div>
-            <h2 className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-700 bg-clip-text text-transparent">
-              Data Sekolah
-            </h2>
-            <p className="text-sm text-slate-500">Lengkapi informasi identitas sekolah</p>
-          </div>
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">Edit Informasi Sekolah</h2>
+          <p className="text-slate-500 text-sm mt-0.5">Lengkapi data identitas sekolah Anda</p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="nama_sekolah" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-violet-500" />
-            Nama Sekolah <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="nama_sekolah"
-            name="nama_sekolah"
-            type="text"
-            placeholder="Masukkan nama sekolah"
-            value={formData.nama_sekolah}
-            onChange={handleInputChange}
-            required
-            disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
-          />
-        </div>
+      <div className="space-y-8">
+        <FormSection title="Informasi Utama" icon={School}>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <FormField
+              id="nama_sekolah"
+              label="Nama Sekolah"
+              icon={Building2}
+              required
+              placeholder="Masukkan nama sekolah"
+              value={formData.nama_sekolah || ""}
+              onChange={handleInputChange}
+              disabled={isLoading || readOnly}
+            />
+            <FormField
+              id="tahun_ajaran"
+              label="Tahun Ajaran"
+              icon={Calendar}
+              required
+              placeholder="Contoh: 2025/2026"
+              value={formData.tahun_ajaran || ""}
+              onChange={handleInputChange}
+              disabled={isLoading || readOnly}
+            />
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 mt-6">
+            <FormField
+              id="npsn"
+              label="NPSN"
+              icon={Hash}
+              placeholder="Masukkan NPSN"
+              value={formData.npsn || ""}
+              onChange={handleInputChange}
+              disabled={isLoading || readOnly}
+            />
+            <FormField
+              id="kepala_sekolah"
+              label="Kepala Sekolah"
+              icon={User}
+              placeholder="Nama kepala sekolah"
+              value={formData.kepala_sekolah || ""}
+              onChange={handleInputChange}
+              disabled={isLoading || readOnly}
+            />
+          </div>
+        </FormSection>
 
-        <div className="space-y-2">
-          <Label htmlFor="tahun_ajaran" className="flex items-center gap-2">
-            <User className="h-4 w-4 text-violet-500" />
-            Tahun Ajaran <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="tahun_ajaran"
-            name="tahun_ajaran"
-            type="text"
-            placeholder="Contoh: 2025/2026"
-            value={formData.tahun_ajaran}
-            onChange={handleInputChange}
-            required
-            disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
-          />
-        </div>
+        <FormSection title="Kontak" icon={Phone}>
+          <div className="grid gap-6 sm:grid-cols-2">
+            <FormField
+              id="telepon"
+              label="Telepon"
+              icon={Phone}
+              placeholder="Masukkan nomor telepon"
+              value={formData.telepon || ""}
+              onChange={handleInputChange}
+              disabled={isLoading || readOnly}
+            />
+            <FormField
+              id="email"
+              label="Email"
+              icon={Mail}
+              type="email"
+              placeholder="contoh@sekolah.sch.id"
+              value={formData.email || ""}
+              onChange={handleInputChange}
+              disabled={isLoading || readOnly}
+            />
+          </div>
+          <div className="mt-6">
+            <FormField
+              id="website"
+              label="Website"
+              icon={Globe}
+              type="url"
+              placeholder="https://www.sekolah.sch.id"
+              value={formData.website || ""}
+              onChange={handleInputChange}
+              disabled={isLoading || readOnly}
+            />
+          </div>
+        </FormSection>
 
-        <div className="space-y-2">
-          <Label htmlFor="npsn" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-violet-500" />
-            NPSN
-          </Label>
-          <Input
-            id="npsn"
-            name="npsn"
-            type="text"
-            placeholder="Masukkan NPSN"
-            value={formData.npsn}
-            onChange={handleInputChange}
-            disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="kepala_sekolah" className="flex items-center gap-2">
-            <User className="h-4 w-4 text-violet-500" />
-            Kepala Sekolah
-          </Label>
-          <Input
-            id="kepala_sekolah"
-            name="kepala_sekolah"
-            type="text"
-            placeholder="Nama kepala sekolah"
-            value={formData.kepala_sekolah}
-            onChange={handleInputChange}
-            disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
-          />
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="alamat" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-violet-500" />
-            Alamat
-          </Label>
-          <Textarea
+        <FormSection title="Alamat" icon={MapPin}>
+          <TextareaField
             id="alamat"
-            name="alamat"
-            placeholder="Masukkan alamat lengkap"
-            value={formData.alamat}
+            label="Alamat Lengkap"
+            placeholder="Masukkan alamat lengkap sekolah"
+            value={formData.alamat || ""}
             onChange={handleInputChange}
             disabled={isLoading || readOnly}
-            rows={3}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200 resize-none"
           />
-        </div>
+        </FormSection>
 
-        <div className="space-y-2">
-          <Label htmlFor="telepon" className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-violet-500" />
-            Telepon
-          </Label>
-          <Input
-            id="telepon"
-            name="telepon"
-            type="text"
-            placeholder="Masukkan nomor telepon"
-            value={formData.telepon}
-            onChange={handleInputChange}
-            disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email" className="flex items-center gap-2">
-            <Mail className="h-4 w-4 text-violet-500" />
-            Email
-          </Label>
-          <Input
-            id="email"
-            name="email"
-            type="email"
-            placeholder="contoh@sekolah.sch.id"
-            value={formData.email}
-            onChange={handleInputChange}
-            disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
-          />
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="website" className="flex items-center gap-2">
-            <Globe className="h-4 w-4 text-violet-500" />
-            Website
-          </Label>
-          <Input
-            id="website"
-            name="website"
-            type="url"
-            placeholder="https://www.sekolah.sch.id"
-            value={formData.website}
-            onChange={handleInputChange}
-            disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
-          />
-        </div>
-
-        <div className="space-y-2 md:col-span-2">
-          <Label htmlFor="logo_url" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-violet-500" />
-            URL Logo
-          </Label>
-          <Input
+        <FormSection title="Media" icon={ImagePlus}>
+          <FormField
             id="logo_url"
-            name="logo_url"
+            label="URL Logo Sekolah"
+            icon={ImagePlus}
             type="url"
             placeholder="https://example.com/logo.png"
-            value={formData.logo_url}
+            value={formData.logo_url || ""}
             onChange={handleInputChange}
             disabled={isLoading || readOnly}
-            className="focus:ring-2 focus:ring-violet-500/20 border-slate-200"
+            hint="Masukkan URL gambar logo sekolah (format PNG/JPG)"
           />
-          <p className="text-xs text-slate-500">
-            Masukkan URL gambar untuk logo sekolah
-          </p>
-        </div>
+          {formData.logo_url && (
+            <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+              <p className="text-xs text-slate-500 mb-3 font-medium">Preview Logo:</p>
+              <div className="h-24 w-24 rounded-xl bg-white border border-slate-200 p-2 shadow-sm">
+                <img 
+                  src={formData.logo_url} 
+                  alt="Logo Preview"
+                  className="h-full w-full object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </FormSection>
       </div>
 
       {!readOnly && (
-        <div className="flex gap-3 pt-2">
+        <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-100">
           <Button 
             type="submit" 
             disabled={isLoading}
-            className="flex-1 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-lg shadow-violet-500/30"
+            className="flex-1 sm:flex-none bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 shadow-lg shadow-violet-500/25 text-white"
           >
+            <Save className="h-4 w-4 mr-2" />
             {isLoading ? "Menyimpan..." : "Simpan Perubahan"}
           </Button>
           <Button 
@@ -272,10 +247,133 @@ export function SekolahForm({ initialData, readOnly = false, apiEndpoint = "/api
             disabled={isLoading}
             className="border-slate-200 hover:bg-slate-50"
           >
-            Batal
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Reset
           </Button>
         </div>
       )}
     </form>
+  )
+}
+
+function FormSection({ 
+  title, 
+  icon: Icon, 
+  children 
+}: { 
+  title: string
+  icon: any
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center border border-slate-200">
+          <Icon className="h-5 w-5 text-slate-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+      </div>
+      <div className="pl-0 sm:pl-13">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function FormField({
+  id,
+  label,
+  icon: Icon,
+  required,
+  type = "text",
+  placeholder,
+  value,
+  onChange,
+  disabled,
+  hint
+}: {
+  id: string
+  label: string
+  icon: any
+  required?: boolean
+  type?: string
+  placeholder: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  disabled?: boolean
+  hint?: string
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="flex items-center gap-2 text-slate-700">
+        <Icon className="h-4 w-4 text-slate-400" />
+        {label}
+        {required && <span className="text-red-500">*</span>}
+      </Label>
+      <Input
+        id={id}
+        name={id}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        required={required}
+        disabled={disabled}
+        className="border-slate-200 focus:border-violet-400 focus:ring-violet-400/20"
+      />
+      {hint && <p className="text-xs text-slate-400">{hint}</p>}
+    </div>
+  )
+}
+
+function TextareaField({
+  id,
+  label,
+  placeholder,
+  value,
+  onChange,
+  disabled
+}: {
+  id: string
+  label: string
+  placeholder: string
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id} className="text-slate-700">{label}</Label>
+      <Textarea
+        id={id}
+        name={id}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        rows={3}
+        className="border-slate-200 focus:border-violet-400 focus:ring-violet-400/20 resize-none"
+      />
+    </div>
+  )
+}
+
+function Hash({ className }: { className?: string }) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <line x1="4" x2="20" y1="9" y2="9" />
+      <line x1="4" x2="20" y1="15" y2="15" />
+      <line x1="10" x2="8" y1="3" y2="21" />
+      <line x1="16" x2="14" y1="3" y2="21" />
+    </svg>
   )
 }
