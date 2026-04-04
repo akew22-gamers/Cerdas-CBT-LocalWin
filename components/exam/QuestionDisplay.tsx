@@ -49,7 +49,7 @@ export function QuestionDisplay({
   }, [teksSoal, questionNumber])
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 md:p-8">
+    <div className="bg-white rounded-2xl shadow-md shadow-slate-200/50 ring-1 ring-slate-100 border border-slate-100 p-4 sm:p-6 md:p-8">
       <div className="flex items-start gap-4 mb-4 sm:mb-6">
         <span className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-xl shadow-sm shadow-blue-500/25 flex items-center justify-center font-bold text-sm sm:text-lg">
           {questionNumber}

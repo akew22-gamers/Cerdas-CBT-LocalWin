@@ -20,7 +20,7 @@ export function QuestionNavigator({
       <h3 className="text-xs sm:text-sm font-semibold text-slate-800 mb-3 sm:mb-4 uppercase tracking-wider">
         Navigasi Soal
       </h3>
-      <div className="grid grid-cols-5 sm:grid-cols-5 gap-1 sm:gap-2 md:gap-3">
+      <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
         {Array.from({ length: totalQuestions }, (_, i) => i + 1).map((num) => {
           const isAnswered = answeredQuestions.includes(num)
           const isCurrent = num === currentQuestion
@@ -30,7 +30,7 @@ export function QuestionNavigator({
               key={num}
               onClick={() => onQuestionSelect(num)}
               className={cn(
-                'aspect-square rounded-xl font-bold text-xs sm:text-sm transition-all duration-200',
+                'aspect-square rounded-lg font-bold text-xs transition-all duration-200',
                 'flex items-center justify-center',
                 'touch-manipulation active:scale-95',
                 isCurrent && 'ring-2 ring-blue-500 ring-offset-2',
