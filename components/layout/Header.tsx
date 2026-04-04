@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { LogOut, User, ChevronDown, Settings } from "lucide-react"
+import { LogOut, User, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   DropdownMenu,
@@ -18,7 +18,6 @@ import {
   AvatarFallback,
 } from "@/components/ui/avatar"
 import { ProfileDialog } from "./ProfileDialog"
-import { SettingsDialog } from "./SettingsDialog"
 
 interface HeaderProps {
   user: {
@@ -62,7 +61,6 @@ export function Header({ user, className }: HeaderProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = React.useState(false)
   const [showProfile, setShowProfile] = React.useState(false)
-  const [showSettings, setShowSettings] = React.useState(false)
 
   const handleLogout = async () => {
     setIsLoading(true)
@@ -134,13 +132,6 @@ export function Header({ user, className }: HeaderProps) {
                 <User className="mr-3 h-4 w-4 text-slate-500" />
                 <span>Profil</span>
               </DropdownMenuItem>
-              <DropdownMenuItem 
-                className="cursor-pointer py-2.5 px-4 hover:bg-slate-50"
-                onClick={() => setShowSettings(true)}
-              >
-                <Settings className="mr-3 h-4 w-4 text-slate-500" />
-                <span>Pengaturan</span>
-              </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
@@ -167,11 +158,6 @@ export function Header({ user, className }: HeaderProps) {
           role: user.role as 'super_admin' | 'guru' | 'siswa',
           nisn: user.nisn
         }}
-      />
-      
-      <SettingsDialog 
-        open={showSettings} 
-        onOpenChange={setShowSettings}
       />
     </>
   )
