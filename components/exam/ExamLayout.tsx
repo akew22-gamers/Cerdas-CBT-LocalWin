@@ -3,6 +3,9 @@
 import { useEffect, useState, ReactNode, useCallback } from 'react'
 import Image from 'next/image'
 
+// KatEx CSS hanya dimuat di halaman ujian (bukan di semua halaman)
+const KATEX_CSS = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css'
+
 interface ExamLayoutProps {
   children: ReactNode
   timer: ReactNode
@@ -25,6 +28,20 @@ export function ExamLayout({
 }: ExamLayoutProps) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [wakeLock, setWakeLock] = useState<WakeLockSentinel | null>(null)
+
+  // Muat KatEx CSS hanya saat halaman ujian aktif, hapus saat keluar
+  useEffect(() => {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = KATEX_CSS
+    link.id = 'katex-css'
+    if (!document.getElementById('katex-css')) {
+      document.head.appendChild(link)
+    }
+    return () => {
+      document.getElementById('katex-css')?.remove()
+    }
+  }, [])
 
   const enterFullscreen = useCallback(async () => {
     if (!document.fullscreenElement && document.fullscreenEnabled) {

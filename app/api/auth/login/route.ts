@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import bcrypt from 'bcryptjs'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createSession, SESSION_COOKIE_NAME, SESSION_DURATION_SECONDS } from '@/lib/auth/session'
+import { createSession, SESSION_COOKIE_NAME, SESSION_CLAIMS_COOKIE_NAME, SESSION_DURATION_SECONDS, signClaims } from '@/lib/auth/session'
 
 export async function POST(request: Request) {
   try {
@@ -71,9 +71,23 @@ export async function POST(request: Request) {
       user.nama || null
     )
 
-    // Set session cookie
-    const cookieStore =await cookies()
+    // Set session token cookie
+    const cookieStore = await cookies()
     cookieStore.set(SESSION_COOKIE_NAME, session.token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: SESSION_DURATION_SECONDS,
+      path: '/'
+    })
+
+    // Set claims cookie (digunakan middleware untuk skip DB query)
+    const claimsPayload = {
+      role,
+      uid: user.id,
+      exp: Math.floor(Date.now() / 1000) + SESSION_DURATION_SECONDS
+    }
+    cookieStore.set(SESSION_CLAIMS_COOKIE_NAME, signClaims(claimsPayload), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

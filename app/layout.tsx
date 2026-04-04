@@ -26,12 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" className={cn(inter.variable, "light")}>
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
-        />
-      </head>
+      <head />
       <body className="antialiased font-sans">
         <SessionProvider>
           {children}

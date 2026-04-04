@@ -1,8 +1,10 @@
-import {cookies} from 'next/headers'
+import { cookies } from 'next/headers'
+import { cache } from 'react'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { randomBytes, createHash } from 'crypto'
+import { randomBytes, createHash, createHmac } from 'crypto'
 
 export const SESSION_COOKIE_NAME = 'cbt_session_token'
+export const SESSION_CLAIMS_COOKIE_NAME = 'cbt_session_claims'
 export const SESSION_DURATION_SECONDS = 7 * 24 * 60 * 60 // 7 days
 
 export interface SessionUser {
@@ -26,6 +28,34 @@ export function generateSessionToken(): string {
 export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex')
 }
+
+// --- Claims Cookie (untuk middleware tanpa DB query) ---
+
+function getSessionSecret(): string {
+  return process.env.SESSION_SECRET || process.env.SETUP_TOKEN || 'fallback-secret-change-me'
+}
+
+export function signClaims(payload: { role: string; uid: string; exp: number }): string {
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url')
+  const sig = createHmac('sha256', getSessionSecret()).update(data).digest('base64url')
+  return `${data}.${sig}`
+}
+
+export function verifyClaims(claims: string): { role: string; uid: string; exp: number } | null {
+  try {
+    const [data, sig] = claims.split('.')
+    if (!data || !sig) return null
+    const expected = createHmac('sha256', getSessionSecret()).update(data).digest('base64url')
+    if (sig !== expected) return null
+    const payload = JSON.parse(Buffer.from(data, 'base64url').toString())
+    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null
+    return payload
+  } catch {
+    return null
+  }
+}
+
+// --- Session management ---
 
 export async function createSession(
   userId: string,
@@ -58,7 +88,12 @@ export async function createSession(
   }
 }
 
-export async function getSession(): Promise<SessionData | null> {
+/**
+ * getSession — di-cache per request lifecycle menggunakan React.cache().
+ * Artinya dalam satu halaman, meskipun dipanggil berkali-kali,
+ * query ke database hanya dilakukan satu kali.
+ */
+export const getSession = cache(async (): Promise<SessionData | null> => {
   const cookieStore = await cookies()
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value
 
@@ -80,7 +115,7 @@ export async function getSession(): Promise<SessionData | null> {
     return null
   }
 
-  // Get user details based on role
+  // Ambil data user berdasarkan role
   let username = ''
   let nama: string | null = null
 
@@ -120,7 +155,7 @@ export async function getSession(): Promise<SessionData | null> {
     token,
     expiresAt: new Date(session.expires_at)
   }
-}
+})
 
 export async function deleteSession(): Promise<void> {
   const cookieStore = await cookies()
@@ -150,5 +185,6 @@ export function clearSessionCookie(): void {
   ;(async () => {
     const cookieStore = await cookies()
     cookieStore.delete(SESSION_COOKIE_NAME)
+    cookieStore.delete(SESSION_CLAIMS_COOKIE_NAME)
   })()
 }

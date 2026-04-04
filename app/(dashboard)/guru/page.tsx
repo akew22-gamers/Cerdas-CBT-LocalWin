@@ -21,40 +21,38 @@ interface DashboardData {
 async function getDashboardData(userId: string): Promise<{ data: DashboardData; ujianIds: string[] }> {
   const supabase = createAdminClient()
 
-  const { data: kelasData } = await supabase
-    .from('kelas')
-    .select('id')
-    .eq('created_by', userId)
+  // Semua query dijalankan PARALEL menggunakan Promise.all
+  const [
+    { data: kelasData },
+    { data: siswaData },
+    { data: ujianData },
+    { data: recentHasil }
+  ] = await Promise.all([
+    supabase.from('kelas').select('id').eq('created_by', userId),
+    supabase.from('siswa').select('id').eq('created_by', userId),
+    supabase.from('ujian').select('id, status').eq('created_by', userId),
+    supabase
+      .from('hasil_ujian')
+      .select(`
+        id,
+        nilai,
+        waktu_selesai,
+        siswa:siswa_id (
+          nama,
+          nisn
+        ),
+        ujian:ujian_id (
+          judul
+        )
+      `)
+      .eq('is_submitted', true)
+      .order('waktu_selesai', { ascending: false })
+      .limit(5)
+  ])
 
-  const { data: siswaData } = await supabase
-    .from('siswa')
-    .select('id')
-    .eq('created_by', userId)
-
-  const { data: ujianData } = await supabase
-    .from('ujian')
-    .select('id, status')
-    .eq('created_by', userId)
-
-  const ujianAktif = (ujianData || []).filter((u: any) => u.status === 'aktif').length
-
-  const { data: recentHasil } = await supabase
-    .from('hasil_ujian')
-    .select(`
-      id,
-      nilai,
-      waktu_selesai,
-      siswa:siswa_id (
-        nama,
-        nisn
-      ),
-      ujian:ujian_id (
-        judul
-      )
-    `)
-    .eq('is_submitted', true)
-    .order('waktu_selesai', { ascending: false })
-    .limit(5)
+  // Hitung dari data yang sudah ada — tidak perlu query ke-5 (duplikat)
+  const ujianAktif = (ujianData || []).filter((u: any) => u.status === 'aktif')
+  const activeUjianIds = ujianAktif.map((u: { id: string }) => u.id)
 
   const formattedRecentHasil = (recentHasil || []).map((h: any) => ({
     id: h.id,
@@ -65,21 +63,15 @@ async function getDashboardData(userId: string): Promise<{ data: DashboardData; 
     submitted_at: h.waktu_selesai
   }))
 
-  const { data: activeUjian } = await supabase
-    .from('ujian')
-    .select('id')
-    .eq('created_by', userId)
-    .eq('status', 'aktif')
-
   return {
     data: {
       kelas_count: kelasData?.length || 0,
       siswa_count: siswaData?.length || 0,
       ujian_count: ujianData?.length || 0,
-      ujian_aktif: ujianAktif,
+      ujian_aktif: ujianAktif.length,
       recent_hasil: formattedRecentHasil
     },
-    ujianIds: activeUjian ? activeUjian.map((u: { id: string }) => u.id) : []
+    ujianIds: activeUjianIds
   }
 }
 

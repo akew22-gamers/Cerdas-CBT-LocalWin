@@ -33,6 +33,7 @@ interface DashboardData {
 async function getDashboardData(siswaId: string): Promise<DashboardData> {
   const supabase = createAdminClient()
 
+  // Query 1: Ambil data siswa
   const { data: siswa } = await supabase
     .from('siswa')
     .select('id, nama, nisn, kelas_id')
@@ -50,64 +51,65 @@ async function getDashboardData(siswaId: string): Promise<DashboardData> {
     }
   }
 
-  const { data: hasilData } = await supabase
-    .from('hasil_ujian')
-    .select('nilai')
-    .eq('siswa_id', siswaId)
-    .eq('is_submitted', true)
+  // Queries 2, 3, 4 dijalankan PARALEL — semua tidak bergantung satu sama lain
+  const [
+    { data: hasilData },
+    { data: ujianKelas },
+    { data: recentHasil }
+  ] = await Promise.all([
+    supabase
+      .from('hasil_ujian')
+      .select('nilai, ujian_id')
+      .eq('siswa_id', siswaId)
+      .eq('is_submitted', true),
+    supabase
+      .from('ujian_kelas')
+      .select('ujian_id')
+      .eq('kelas_id', siswa.kelas_id),
+    supabase
+      .from('hasil_ujian')
+      .select(`
+        id,
+        nilai,
+        waktu_selesai,
+        is_submitted,
+        ujian:ujian_id (
+          id,
+          judul,
+          show_result
+        )
+      `)
+      .eq('siswa_id', siswaId)
+      .eq('is_submitted', true)
+      .order('waktu_selesai', { ascending: false })
+      .limit(5)
+  ])
 
   const totalUjianSelesai = hasilData?.length || 0
   const rataRataNilai = totalUjianSelesai > 0 && hasilData
     ? Math.round(hasilData.reduce((sum, h) => sum + Number(h.nilai), 0) / totalUjianSelesai)
     : 0
 
-  const { data: ujianKelas } = await supabase
-    .from('ujian_kelas')
-    .select('ujian_id')
-    .eq('kelas_id', siswa.kelas_id)
+  // Hitung ujian tersedia: dari ujian kelas, filter yang sudah selesai
+  const completedIds = new Set((hasilData || []).map(h => h.ujian_id))
+  const ujianIds = (ujianKelas || []).map(uk => uk.ujian_id).filter(id => !completedIds.has(id))
 
-  const ujianIds = (ujianKelas || []).map(uk => uk.ujian_id)
+  // Query 5: Ambil detail ujian yang tersedia (bergantung pada ujianIds)
+  const { data: availableUjian } = ujianIds.length > 0
+    ? await supabase
+        .from('ujian')
+        .select('id, kode_ujian, judul, durasi, show_result')
+        .in('id', ujianIds)
+        .eq('status', 'aktif')
+    : { data: [] }
 
-  const { data: availableUjian } = await supabase
-    .from('ujian')
-    .select('id, kode_ujian, judul, durasi, show_result')
-    .in('id', ujianIds)
-    .eq('status', 'aktif')
-
-  const { data: completedUjian } = await supabase
-    .from('hasil_ujian')
-    .select('ujian_id')
-    .eq('siswa_id', siswaId)
-    .eq('is_submitted', true)
-
-  const completedIds = (completedUjian || []).map(h => h.ujian_id)
-  const filteredUjian = (availableUjian || []).filter(u => !completedIds.includes(u.id))
-
-  const formattedAvailableUjian = filteredUjian.map((u: any) => ({
+  const formattedAvailableUjian = (availableUjian || []).map((u: any) => ({
     id: u.id,
     kode_ujian: u.kode_ujian,
     judul: u.judul,
     durasi: u.durasi,
     show_result: u.show_result
   }))
-
-  const { data: recentHasil } = await supabase
-    .from('hasil_ujian')
-    .select(`
-      id,
-      nilai,
-      waktu_selesai,
-      is_submitted,
-      ujian:ujian_id (
-        id,
-        judul,
-        show_result
-      )
-    `)
-    .eq('siswa_id', siswaId)
-    .eq('is_submitted', true)
-    .order('waktu_selesai', { ascending: false })
-    .limit(5)
 
   const formattedRecentHasil = (recentHasil || []).map((h: any) => ({
     id: h.id,
