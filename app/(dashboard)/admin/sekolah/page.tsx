@@ -43,11 +43,8 @@ export default async function AdminSekolahPage() {
         <div className="max-w-6xl mx-auto space-y-8 p-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl blur-lg opacity-40" />
-                <div className="relative h-14 w-14 flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-xl shadow-violet-500/25">
-                  <School className="h-7 w-7 text-white" />
-                </div>
+              <div className="h-12 w-12 rounded-xl bg-violet-100 flex flex-shrink-0 items-center justify-center border border-violet-200">
+                <School className="h-6 w-6 text-violet-600" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900">
@@ -67,18 +64,18 @@ export default async function AdminSekolahPage() {
           </div>
 
           <Tabs defaultValue="preview" className="space-y-6">
-            <div className="flex items-center justify-between">
-              <TabsList className="bg-white/80 backdrop-blur-sm border border-slate-200/60 shadow-sm p-1 rounded-xl">
+            <div className="flex items-center">
+              <TabsList className="bg-slate-100 border border-slate-200 p-1 rounded-xl">
                 <TabsTrigger 
                   value="preview" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg px-6"
+                  className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm text-slate-600"
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   Preview
                 </TabsTrigger>
                 <TabsTrigger 
                   value="edit" 
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-violet-500 data-[state=active]:to-purple-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg px-6"
+                  className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm text-slate-600"
                 >
                   <Edit3 className="h-4 w-4 mr-2" />
                   Edit Data
@@ -90,7 +87,7 @@ export default async function AdminSekolahPage() {
               {sekolah ? (
                 <SekolahDisplay data={sekolah} />
               ) : (
-                <Card className="border-slate-200/60 bg-white/80 backdrop-blur-sm shadow-xl shadow-slate-200/40">
+                <Card className="border-slate-200 bg-white shadow-sm">
                   <CardContent className="py-16">
                     <div className="text-center space-y-4">
                       <div className="mx-auto h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center">
@@ -109,7 +106,7 @@ export default async function AdminSekolahPage() {
             </TabsContent>
 
             <TabsContent value="edit" className="space-y-6 mt-0">
-              <Card className="border-slate-200/60 bg-white/80 backdrop-blur-sm shadow-xl shadow-slate-200/40">
+              <Card className="border-slate-200 bg-white shadow-sm">
                 <CardContent className="pt-8">
                   <SekolahForm initialData={sekolah || undefined} />
                 </CardContent>

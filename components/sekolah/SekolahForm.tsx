@@ -94,16 +94,13 @@ export function SekolahForm({ initialData, readOnly = false, apiEndpoint = "/api
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="flex items-center gap-4 pb-6 border-b border-slate-100">
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl blur-lg opacity-40" />
-          <div className="relative h-14 w-14 flex items-center justify-center bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-xl shadow-violet-500/25">
-            <Sparkles className="h-7 w-7 text-white" />
-          </div>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-4 border-b border-slate-100">
+        <div className="h-12 w-12 flex items-center justify-center bg-violet-100 rounded-xl border border-violet-200 flex-shrink-0">
+          <School className="h-6 w-6 text-violet-600" />
         </div>
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Edit Informasi Sekolah</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Lengkapi data identitas sekolah Anda</p>
+          <h2 className="text-xl font-bold text-slate-900">Edit Informasi Sekolah</h2>
+          <p className="text-slate-500 text-sm mt-0.5">Perbarui data identitas sekolah dengan format yang benar</p>
         </div>
       </div>
 
@@ -266,14 +263,12 @@ function FormSection({
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-50 flex items-center justify-center border border-slate-200">
-          <Icon className="h-5 w-5 text-slate-600" />
-        </div>
-        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex items-center gap-2 pb-3 border-b border-slate-100">
+        <Icon className="h-4 w-4 text-violet-600" />
+        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
       </div>
-      <div className="pl-0 sm:pl-13">
+      <div className="pt-2">
         {children}
       </div>
     </div>
