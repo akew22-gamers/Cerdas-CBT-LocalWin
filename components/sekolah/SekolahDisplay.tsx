@@ -1,10 +1,14 @@
 "use client"
 
+import * as React from "react"
 import {
   Card,
   CardContent,
 } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogTrigger, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { SekolahForm } from "./SekolahForm"
 import { 
   Building2, 
   Mail, 
@@ -18,7 +22,8 @@ import {
   MailOpen,
   Globe2,
   UserCheck,
-  Hash
+  Hash,
+  Edit3
 } from "lucide-react"
 
 interface SekolahData {
@@ -34,15 +39,83 @@ interface SekolahData {
 }
 
 interface SekolahDisplayProps {
-  data: SekolahData
+  data: SekolahData | null
 }
 
 export function SekolahDisplay({ data }: SekolahDisplayProps) {
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false)
+
+  if (!data) {
+    return (
+      <Card className="border-slate-200 bg-white shadow-sm">
+        <CardContent className="py-16">
+          <div className="text-center space-y-4">
+            <div className="mx-auto h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center">
+              <School className="h-10 w-10 text-slate-400" />
+            </div>
+            <div>
+              <p className="text-lg font-medium text-slate-900">Belum ada data sekolah</p>
+              <p className="text-slate-500 mt-1 mb-4">
+                Silakan lengkapi informasi identitas pertama kali.
+              </p>
+            </div>
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogTrigger render={<Button className="bg-violet-600 hover:bg-violet-700 text-white" />}>
+                <Edit3 className="mr-2 h-4 w-4" /> Lengkapi Data Sekolah
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-xl">Lengkapi Informasi Sekolah</DialogTitle>
+                  <DialogDescription>
+                    Perbarui data identitas sekolah dengan format yang benar
+                  </DialogDescription>
+                </DialogHeader>
+                <SekolahForm onSuccess={() => setIsEditDialogOpen(false)} />
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-slate-200 bg-white shadow-sm">
         <div className="px-6 py-6 border-b border-slate-100 bg-slate-50/50">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 relative">
+            
+            <div className="absolute top-0 right-0 sm:static sm:ml-auto order-first sm:order-last">
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogTrigger render={<Button variant="outline" size="sm" className="border-violet-200 text-violet-700 hover:bg-violet-50" />}>
+                  <Edit3 className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Edit Data</span>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-xl">Edit Informasi Sekolah</DialogTitle>
+                    <DialogDescription>
+                      Perbarui data identitas sekolah. Pastikan data yang dimasukkan valid.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <SekolahForm 
+                    initialData={{
+                      nama_sekolah: data.nama_sekolah,
+                      npsn: data.npsn || undefined,
+                      alamat: data.alamat || undefined,
+                      logo_url: data.logo_url || undefined,
+                      telepon: data.telepon || undefined,
+                      email: data.email || undefined,
+                      website: data.website || undefined,
+                      kepala_sekolah: data.kepala_sekolah || undefined,
+                      tahun_ajaran: data.tahun_ajaran
+                    }} 
+                    onSuccess={() => setIsEditDialogOpen(false)} 
+                  />
+                </DialogContent>
+              </Dialog>
+            </div>
+
             <div className="flex-shrink-0">
               {data.logo_url ? (
                 <div className="h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-white border border-slate-200 p-2 shadow-sm">

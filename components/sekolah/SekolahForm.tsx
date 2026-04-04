@@ -38,9 +38,10 @@ interface SekolahFormProps {
   initialData?: SekolahFormData
   readOnly?: boolean
   apiEndpoint?: string
+  onSuccess?: () => void
 }
 
-export function SekolahForm({ initialData, readOnly = false, apiEndpoint = "/api/admin/sekolah" }: SekolahFormProps) {
+export function SekolahForm({ initialData, readOnly = false, apiEndpoint = "/api/admin/sekolah", onSuccess }: SekolahFormProps) {
   const router = useRouter()
   const [isLoading, setIsLoading] = React.useState(false)
   const [formData, setFormData] = React.useState<SekolahFormData>({
@@ -84,6 +85,9 @@ export function SekolahForm({ initialData, readOnly = false, apiEndpoint = "/api
 
       toast.success("Data sekolah berhasil disimpan")
       router.refresh()
+      if (onSuccess) {
+        onSuccess()
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Terjadi kesalahan"
       toast.error(errorMessage)
@@ -93,16 +97,7 @@ export function SekolahForm({ initialData, readOnly = false, apiEndpoint = "/api
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-4 border-b border-slate-100">
-        <div className="h-12 w-12 flex items-center justify-center bg-violet-100 rounded-xl border border-violet-200 flex-shrink-0">
-          <School className="h-6 w-6 text-violet-600" />
-        </div>
-        <div>
-          <h2 className="text-xl font-bold text-slate-900">Edit Informasi Sekolah</h2>
-          <p className="text-slate-500 text-sm mt-0.5">Perbarui data identitas sekolah dengan format yang benar</p>
-        </div>
-      </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
 
       <div className="space-y-8">
         <FormSection title="Informasi Utama" icon={School}>

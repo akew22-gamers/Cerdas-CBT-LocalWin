@@ -2,12 +2,9 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { DashboardLayout } from '@/components/layout'
-import { SekolahForm } from '@/components/sekolah/SekolahForm'
 import { SekolahDisplay } from '@/components/sekolah/SekolahDisplay'
-import { Card, CardContent } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
-import { School, Edit3, Eye } from 'lucide-react'
+import { School } from 'lucide-react'
 
 export default async function AdminSekolahPage() {
   const session = await getSession()
@@ -63,56 +60,9 @@ export default async function AdminSekolahPage() {
             )}
           </div>
 
-          <Tabs defaultValue="preview" className="space-y-6">
-            <div className="flex items-center">
-              <TabsList className="bg-slate-100 border border-slate-200 p-1 rounded-xl">
-                <TabsTrigger 
-                  value="preview" 
-                  className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm text-slate-600"
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Preview
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="edit" 
-                  className="rounded-lg px-6 data-[state=active]:bg-white data-[state=active]:text-violet-700 data-[state=active]:shadow-sm text-slate-600"
-                >
-                  <Edit3 className="h-4 w-4 mr-2" />
-                  Edit Data
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <TabsContent value="preview" className="space-y-6 mt-0">
-              {sekolah ? (
-                <SekolahDisplay data={sekolah} />
-              ) : (
-                <Card className="border-slate-200 bg-white shadow-sm">
-                  <CardContent className="py-16">
-                    <div className="text-center space-y-4">
-                      <div className="mx-auto h-20 w-20 rounded-full bg-slate-100 flex items-center justify-center">
-                        <School className="h-10 w-10 text-slate-400" />
-                      </div>
-                      <div>
-                        <p className="text-lg font-medium text-slate-900">Belum ada data sekolah</p>
-                        <p className="text-slate-500 mt-1">
-                          Silakan lengkapi informasi sekolah pada tab "Edit Data"
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            <TabsContent value="edit" className="space-y-6 mt-0">
-              <Card className="border-slate-200 bg-white shadow-sm">
-                <CardContent className="pt-8">
-                  <SekolahForm initialData={sekolah || undefined} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+          <div className="mt-8">
+            <SekolahDisplay data={sekolah} />
+          </div>
         </div>
       </div>
     </DashboardLayout>
