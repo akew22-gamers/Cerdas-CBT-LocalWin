@@ -116,12 +116,10 @@ export function EditUjianDialog({ ujian, onUpdated }: EditUjianDialogProps) {
           <Button
             variant="outline"
             size="sm"
-            className="gap-1"
             disabled={isActive}
             title={isActive ? "Nonaktifkan ujian terlebih dahulu untuk edit" : "Edit"}
           >
             <Pencil className="h-4 w-4" />
-            Edit
           </Button>
         }
       />

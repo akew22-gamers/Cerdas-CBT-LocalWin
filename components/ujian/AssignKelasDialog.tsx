@@ -124,11 +124,9 @@ export function AssignKelasDialog({
             <Button
               variant="outline"
               size="sm"
-              className="gap-1"
               title="Assign Kelas"
             >
               <Users className="h-4 w-4" />
-              Kelas
             </Button>
           }
         />

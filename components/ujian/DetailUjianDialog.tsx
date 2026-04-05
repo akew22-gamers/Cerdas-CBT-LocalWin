@@ -62,11 +62,9 @@ export function DetailUjianDialog({ ujian }: DetailUjianDialogProps) {
           <Button
             variant="outline"
             size="sm"
-            className="gap-1"
             title="Lihat Detail"
           >
             <Eye className="h-4 w-4" />
-            Detail
           </Button>
         }
       />

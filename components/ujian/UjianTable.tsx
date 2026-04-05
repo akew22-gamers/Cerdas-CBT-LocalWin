@@ -230,85 +230,73 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                   </div>
                 )}
 
-                <div className="space-y-2 pt-3 border-t border-gray-100">
-                  <div className="flex gap-2">
-                    <DetailUjianDialog ujian={ujian} />
-                    <AssignKelasDialog
-                      ujianId={ujian.id}
-                      initialKelas={ujian.kelas}
-                      onAssignSuccess={() => router.refresh()}
+                <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
+                  <DetailUjianDialog ujian={ujian} />
+                  <AssignKelasDialog
+                    ujianId={ujian.id}
+                    initialKelas={ujian.kelas}
+                    onAssignSuccess={() => router.refresh()}
+                  />
+                  <EditUjianDialog ujian={ujian} onUpdated={onDelete || onToggle} />
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleToggle(ujian.id, ujian.status, ujian.judul)}
+                    className={ujian.status === "aktif" ? "border-orange-200 text-orange-600 hover:bg-orange-50" : "border-green-200 text-green-600 hover:bg-green-50"}
+                    title={ujian.status === "aktif" ? "Nonaktifkan ujian" : "Aktifkan ujian"}
+                  >
+                    {ujian.status === "aktif" ? (
+                      <ToggleLeft className="h-4 w-4" />
+                    ) : (
+                      <ToggleRight className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDuplicate(ujian.id)}
+                    title="Duplikat ujian"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger
+                      render={
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={ujian.status === "aktif"}
+                          title={ujian.status === "aktif" ? "Nonaktifkan ujian terlebih dahulu untuk hapus" : "Hapus ujian"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      }
                     />
-                    <EditUjianDialog ujian={ujian} onUpdated={onDelete || onToggle} />
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleToggle(ujian.id, ujian.status, ujian.judul)}
-                      className={`flex-1 ${ujian.status === "aktif" ? "border-orange-200 text-orange-600 hover:bg-orange-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}
-                    >
-                      {ujian.status === "aktif" ? (
-                        <>
-                          <ToggleLeft className="h-4 w-4 mr-1" />
-                          Nonaktifkan
-                        </>
-                      ) : (
-                        <>
-                          <ToggleRight className="h-4 w-4 mr-1" />
-                          Aktifkan
-                        </>
-                      )}
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDuplicate(ujian.id)}
-                      className="flex-1"
-                    >
-                      <Copy className="h-4 w-4 mr-1" />
-                      Duplikat
-                    </Button>
-
-                    <AlertDialog>
-                      <AlertDialogTrigger
-                        render={
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="flex-1"
-                            disabled={ujian.status === "aktif"}
-                            title={ujian.status === "aktif" ? "Nonaktifkan ujian terlebih dahulu untuk hapus" : "Hapus Ujian"}
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Hapus
-                          </Button>
-                        }
-                      />
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Hapus Ujian</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Apakah Anda yakin ingin menghapus ujian "
-                            <span className="font-semibold text-foreground">
-                              {ujian.judul}
-                            </span>
-                            "? Semua soal akan ikut terhapus. Aksi ini tidak dapat dibatalkan.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Batal</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => handleDelete(ujian.id, ujian.judul)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Hapus
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Hapus Ujian</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Apakah Anda yakin ingin menghapus ujian "
+                          <span className="font-semibold text-foreground">
+                            {ujian.judul}
+                          </span>
+                          "? Semua soal akan ikut terhapus. Aksi ini tidak dapat dibatalkan.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Batal</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => handleDelete(ujian.id, ujian.judul)}
+                          className="bg-red-600 hover:bg-red-700"
+                        >
+                          Hapus
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </div>
