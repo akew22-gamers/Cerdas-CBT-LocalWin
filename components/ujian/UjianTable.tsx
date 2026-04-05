@@ -243,13 +243,18 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => handleToggle(ujian.id, ujian.status, ujian.judul)}
-                      className={ujian.status === "aktif" ? "border-orange-200 text-orange-600 hover:bg-orange-50" : "border-green-200 text-green-600 hover:bg-green-50"}
-                      title={ujian.status === "aktif" ? "Nonaktifkan ujian" : "Aktifkan ujian"}
+                      className={`gap-1 ${ujian.status === "aktif" ? "border-orange-200 text-orange-600 hover:bg-orange-50" : "border-green-200 text-green-600 hover:bg-green-50"}`}
                     >
                       {ujian.status === "aktif" ? (
-                        <ToggleLeft className="h-4 w-4" />
+                        <>
+                          <ToggleLeft className="h-4 w-4" />
+                          <span>Off</span>
+                        </>
                       ) : (
-                        <ToggleRight className="h-4 w-4" />
+                        <>
+                          <ToggleRight className="h-4 w-4" />
+                          <span>On</span>
+                        </>
                       )}
                     </Button>
 
@@ -257,9 +262,10 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDuplicate(ujian.id)}
-                      title="Duplikat ujian"
+                      className="gap-1"
                     >
                       <Copy className="h-4 w-4" />
+                      <span>Copy</span>
                     </Button>
 
                     <AlertDialog>
@@ -268,10 +274,11 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                           <Button
                             variant="destructive"
                             size="sm"
+                            className="gap-1"
                             disabled={ujian.status === "aktif"}
-                            title={ujian.status === "aktif" ? "Nonaktifkan ujian terlebih dahulu untuk hapus" : "Hapus ujian"}
                           >
                             <Trash2 className="h-4 w-4" />
+                            <span>Hapus</span>
                           </Button>
                         }
                       />
