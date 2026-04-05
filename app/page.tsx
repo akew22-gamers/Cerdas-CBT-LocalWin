@@ -1,5 +1,4 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -18,6 +17,7 @@ import {
   Lock,
   Database
 } from 'lucide-react'
+import { AnimatedSection, AnimatedCard } from '@/components/landing/AnimatedSection'
 
 async function getSetupStatus() {
   try {
@@ -113,8 +113,8 @@ export default async function LandingPage() {
       <header className="relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="bg-white rounded-xl p-2 shadow-lg border border-slate-100">
+            <div className="flex items-center gap-3 group">
+              <div className="bg-white rounded-xl p-2 shadow-lg border border-slate-100 transition-all duration-300 group-hover:shadow-xl group-hover:scale-105">
                 <img
                   src="/images/logo_kemendikdasmen.svg"
                   alt="Logo Kemendikdasmen"
@@ -127,7 +127,7 @@ export default async function LandingPage() {
               </div>
             </div>
             <Link href={setupStatus.isSetupComplete ? '/login' : '/setup'}>
-              <Button className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700">
+              <Button className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all duration-300 hover:scale-105 hover:shadow-lg">
                 Mulai
                 <ChevronRight className="w-4 h-4" />
               </Button>
@@ -136,81 +136,93 @@ export default async function LandingPage() {
         </div>
       </header>
 
-      {/* Hero Section */}
       <section className="relative z-10 py-20 lg:py-28">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-6">
-              <GraduationCap className="w-4 h-4" />
-              Solusi Ujian Digital untuk Sekolah
-            </div>
+            <AnimatedSection>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-medium mb-6">
+                <GraduationCap className="w-4 h-4" />
+                Solusi Ujian Digital untuk Sekolah
+              </div>
+            </AnimatedSection>
             
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
-              Cerdas-CBT
-              <br />
-              <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Ujian Berbasis Komputer
-              </span>
-            </h2>
+            <AnimatedSection delay={100}>
+              <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 mb-6 leading-tight">
+                Cerdas-CBT
+                <br />
+                <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  Ujian Berbasis Komputer
+                </span>
+              </h2>
+            </AnimatedSection>
             
-            <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10">
-              Platform ujian online yang aman, cepat, dan mudah digunakan untuk membantu sekolah
-              melaksanakan ujian berbasis komputer dengan fitur anti-cheating dan analisis hasil yang lengkap.
-            </p>
+            <AnimatedSection delay={200}>
+              <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10">
+                Platform ujian online yang aman, cepat, dan mudah digunakan untuk membantu sekolah
+                melaksanakan ujian berbasis komputer dengan fitur anti-cheating dan analisis hasil yang lengkap.
+              </p>
+            </AnimatedSection>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href={setupStatus.isSetupComplete ? '/login' : '/setup'}>
-                <Button size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-8 h-12">
-                  Mulai Sekarang
-                  <ChevronRight className="w-5 h-5" />
-                </Button>
-              </Link>
-              <a href="#fitur">
-                <Button variant="outline" size="lg" className="text-lg px-8 h-12">
-                  Lihat Fitur
-                </Button>
-              </a>
-            </div>
+            <AnimatedSection delay={300}>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link href={setupStatus.isSetupComplete ? '/login' : '/setup'}>
+                  <Button size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-8 h-12 transition-all duration-300 hover:scale-105 hover:shadow-lg">
+                    Mulai Sekarang
+                    <ChevronRight className="w-5 h-5" />
+                  </Button>
+                </Link>
+                <a href="#fitur">
+                  <Button variant="outline" size="lg" className="text-lg px-8 h-12 transition-all duration-300 hover:scale-105">
+                    Lihat Fitur
+                  </Button>
+                </a>
+              </div>
+            </AnimatedSection>
 
-            {/* Preview Images */}
-            <div className="mt-16 flex justify-center gap-4 flex-wrap">
-              <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100">
-                <Laptop className="w-16 h-16 text-blue-500" />
-                <p className="text-sm text-slate-600 mt-2 font-medium">Desktop</p>
+            <AnimatedSection delay={400}>
+              <div className="mt-16 flex justify-center gap-4 flex-wrap">
+                <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100 transition-all duration-300 hover:scale-110 hover:shadow-2xl cursor-default">
+                  <Laptop className="w-16 h-16 text-blue-500" />
+                  <p className="text-sm text-slate-600 mt-2 font-medium">Desktop</p>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100 transition-all duration-300 hover:scale-110 hover:shadow-2xl cursor-default">
+                  <Smartphone className="w-16 h-16 text-indigo-500" />
+                  <p className="text-sm text-slate-600 mt-2 font-medium">Mobile</p>
+                </div>
+                <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100 transition-all duration-300 hover:scale-110 hover:shadow-2xl cursor-default">
+                  <Monitor className="w-16 h-16 text-purple-500" />
+                  <p className="text-sm text-slate-600 mt-2 font-medium">Tablet</p>
+                </div>
               </div>
-              <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100">
-                <Smartphone className="w-16 h-16 text-indigo-500" />
-                <p className="text-sm text-slate-600 mt-2 font-medium">Mobile</p>
-              </div>
-              <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/50 p-4 border border-slate-100">
-                <Monitor className="w-16 h-16 text-purple-500" />
-                <p className="text-sm text-slate-600 mt-2 font-medium">Tablet</p>
-              </div>
-            </div>
+            </AnimatedSection>
           </div>
         </div>
       </section>
 
       <section id="fitur" className="relative z-10 py-20 bg-white/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-slate-900 mb-4">Fitur Utama</h3>
-            <p className="text-slate-600 max-w-2xl mx-auto">
-              Dilengkapi dengan berbagai fitur untuk mendukung pelaksanaan ujian yang aman dan efisien
-            </p>
-          </div>
+          <AnimatedSection>
+            <div className="text-center mb-16">
+              <h3 className="text-3xl font-bold text-slate-900 mb-4">Fitur Utama</h3>
+              <p className="text-slate-600 max-w-2xl mx-auto">
+                Dilengkapi dengan berbagai fitur untuk mendukung pelaksanaan ujian yang aman dan efisien
+              </p>
+            </div>
+          </AnimatedSection>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature, index) => (
-              <Card key={index} className="bg-white/80 backdrop-blur-sm border-slate-200/60 hover:shadow-lg hover:shadow-slate-200/50 transition-all duration-300">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4">
-                    <feature.icon className="w-6 h-6 text-white" />
-                  </div>
-                  <h4 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h4>
-                  <p className="text-slate-600 text-sm">{feature.description}</p>
-                </CardContent>
-              </Card>
+              <AnimatedCard key={index} delay={index * 100}>
+                <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 transition-all duration-300 hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 h-full">
+                  <CardContent className="p-6">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110">
+                      <feature.icon className="w-6 h-6 text-white" />
+                    </div>
+                    <h4 className="text-lg font-semibold text-slate-900 mb-2">{feature.title}</h4>
+                    <p className="text-slate-600 text-sm">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              </AnimatedCard>
             ))}
           </div>
         </div>
@@ -218,24 +230,28 @@ export default async function LandingPage() {
 
       <section className="relative z-10 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h3 className="text-3xl font-bold text-slate-900 mb-4">Mengapa Cerdas-CBT?</h3>
-            <p className="text-slate-600 max-w-2xl mx-auto">
-              Dibangun dengan teknologi modern untuk memberikan pengalaman terbaik
-            </p>
-          </div>
+          <AnimatedSection>
+            <div className="text-center mb-16">
+              <h3 className="text-3xl font-bold text-slate-900 mb-4">Mengapa Cerdas-CBT?</h3>
+              <p className="text-slate-600 max-w-2xl mx-auto">
+                Dibangun dengan teknologi modern untuk memberikan pengalaman terbaik
+              </p>
+            </div>
+          </AnimatedSection>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {advantages.map((advantage, index) => (
-              <div key={index} className="flex gap-4">
-                <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
-                  <advantage.icon className="w-7 h-7 text-blue-600" />
+              <AnimatedCard key={index} delay={index * 100}>
+                <div className="flex gap-4 p-4 rounded-xl transition-all duration-300 hover:bg-white hover:shadow-lg">
+                  <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 hover:scale-110">
+                    <advantage.icon className="w-7 h-7 text-blue-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold text-slate-900 mb-1">{advantage.title}</h4>
+                    <p className="text-slate-600 text-sm">{advantage.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-slate-900 mb-1">{advantage.title}</h4>
-                  <p className="text-slate-600 text-sm">{advantage.description}</p>
-                </div>
-              </div>
+              </AnimatedCard>
             ))}
           </div>
         </div>
@@ -243,51 +259,55 @@ export default async function LandingPage() {
 
       <section className="relative z-10 py-20 bg-gradient-to-br from-blue-600 to-indigo-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center text-white">
-            <h3 className="text-3xl font-bold mb-4">Tentang Kami</h3>
-            <div className="max-w-3xl mx-auto">
-              <p className="text-blue-100 text-lg mb-8">
-                Cerdas-CBT dikembangkan oleh EASCreative Studio untuk membantu sekolah dalam melaksanakan 
-                ujian berbasis komputer dengan aman, efisien, dan modern. Platform ini dirancang 
-                menggunakan teknologi terkini dengan fokus pada kemudahan penggunaan dan keamanan data.
-              </p>
-              
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8">
-                <h4 className="text-xl font-semibold mb-4">Hubungi Kami</h4>
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-200">Email:</span>
-                    <a href="mailto:contact@eascreative.id" className="text-white hover:underline">
-                      contact@eascreative.id
-                    </a>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-200">Website:</span>
-                    <a href="https://eascreative.id" target="_blank" rel="noopener noreferrer" className="text-white hover:underline">
-                      eascreative.id
-                    </a>
+          <AnimatedSection>
+            <div className="text-center text-white">
+              <h3 className="text-3xl font-bold mb-4">Tentang Kami</h3>
+              <div className="max-w-3xl mx-auto">
+                <p className="text-blue-100 text-lg mb-8">
+                  Cerdas-CBT dikembangkan oleh EAS Creative Studio untuk membantu sekolah dalam melaksanakan 
+                  ujian berbasis komputer dengan aman, efisien, dan modern. Platform ini dirancang 
+                  menggunakan teknologi terkini dengan fokus pada kemudahan penggunaan dan keamanan data.
+                </p>
+                
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 transition-all duration-300 hover:bg-white/15">
+                  <h4 className="text-xl font-semibold mb-4">Hubungi Kami</h4>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-200">Email:</span>
+                      <a href="mailto:eas.creative.studio@gmail.com" className="text-white hover:underline transition-colors">
+                        eas.creative.studio@gmail.com
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-blue-200">Website:</span>
+                      <a href="https://eas.biz.id" target="_blank" rel="noopener noreferrer" className="text-white hover:underline transition-colors">
+                        eas.biz.id
+                      </a>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          </AnimatedSection>
         </div>
       </section>
 
       <section className="relative z-10 py-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">
-            Siap Memulai Ujian Online?
-          </h3>
-          <p className="text-slate-600 mb-8">
-            Bergabunglah dengan sekolah-sekolah yang telah menggunakan Cerdas-CBT
-          </p>
-          <Link href={setupStatus.isSetupComplete ? '/login' : '/setup'}>
-            <Button size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-10 h-12">
-              Mulai Sekarang
-              <ChevronRight className="w-5 h-5" />
-            </Button>
-          </Link>
+          <AnimatedSection>
+            <h3 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-4">
+              Siap Memulai Ujian Online?
+            </h3>
+            <p className="text-slate-600 mb-8">
+              Bergabunglah dengan sekolah-sekolah yang telah menggunakan Cerdas-CBT
+            </p>
+            <Link href={setupStatus.isSetupComplete ? '/login' : '/setup'}>
+              <Button size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-lg px-10 h-12 transition-all duration-300 hover:scale-105 hover:shadow-lg">
+                Mulai Sekarang
+                <ChevronRight className="w-5 h-5" />
+              </Button>
+            </Link>
+          </AnimatedSection>
         </div>
       </section>
 
