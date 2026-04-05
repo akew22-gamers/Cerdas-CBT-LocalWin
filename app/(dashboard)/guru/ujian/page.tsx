@@ -105,9 +105,7 @@ export default async function UjianListPage() {
           <AddUjianDialog />
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-          <UjianTable data={ujian} />
-        </div>
+        <UjianTable data={ujian} />
       </div>
     </DashboardLayout>
   )
