@@ -250,20 +250,69 @@ export function DetailHasilDialog({ open, onOpenChange, hasilId }: DetailHasilDi
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <div className="flex flex-col items-center gap-4 px-8 py-6 rounded-2xl bg-emerald-50 border border-emerald-200">
-                  <PartyPopper className="h-12 w-12 text-emerald-600" />
-                  <h4 className="text-lg font-semibold text-emerald-800">
-                    Terima Kasih!
-                  </h4>
-                  <p className="text-sm text-emerald-700 max-w-xs">
-                    Anda telah menyelesaikan ujian <strong>{data.ujian_judul}</strong> dengan baik.
-                  </p>
-                  <p className="text-xs text-emerald-600">
-                    Hasil ujian tidak ditampilkan oleh guru.
-                  </p>
+              <>
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <div className="flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-emerald-50 border border-emerald-200">
+                    <PartyPopper className="h-10 w-10 text-emerald-600" />
+                    <h4 className="text-lg font-semibold text-emerald-800">
+                      Terima Kasih!
+                    </h4>
+                    <p className="text-sm text-emerald-700">
+                      Anda telah menyelesaikan ujian dengan baik.
+                    </p>
+                  </div>
                 </div>
-              </div>
+
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <Calendar className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Tanggal Ujian</p>
+                      <p className="font-medium text-slate-900">
+                        {formatDate(data.waktu_mulai)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <PlayCircle className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Waktu Mulai</p>
+                      <p className="font-medium text-slate-900">
+                        {formatTime(data.waktu_mulai)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <StopCircle className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Waktu Selesai</p>
+                      <p className="font-medium text-slate-900">
+                        {formatTime(data.waktu_selesai)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Waktu Pengerjaan</p>
+                      <p className="font-medium text-slate-900">
+                        {formatDuration(data.waktu_mulai, data.waktu_selesai, data.durasi)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         ) : null}

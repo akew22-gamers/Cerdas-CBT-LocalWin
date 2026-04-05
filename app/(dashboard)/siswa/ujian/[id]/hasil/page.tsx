@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ArrowLeft, AlertTriangle, Award, CheckCircle2, XCircle } from 'lucide-react'
+import { ArrowLeft, AlertTriangle, Award, CheckCircle2, XCircle, Clock, Calendar, PartyPopper } from 'lucide-react'
 
 interface HasilData {
   id: string
@@ -23,6 +23,24 @@ interface HasilData {
     judul: string
     durasi: number
   }
+}
+
+function formatDuration(startTime: string, endTime: string | null, maxDuration: number): string {
+  if (!endTime) return '-'
+  const start = new Date(startTime)
+  const end = new Date(endTime)
+  const diffMs = end.getTime() - start.getTime()
+  const diffMinutes = Math.floor(diffMs / 60000)
+  const diffSeconds = Math.floor((diffMs % 60000) / 1000)
+
+  if (diffMinutes >= maxDuration) {
+    return `${maxDuration} menit`
+  }
+
+  if (diffMinutes > 0) {
+    return `${diffMinutes} menit ${diffSeconds} detik`
+  }
+  return `${diffSeconds} detik`
 }
 
 export default function HasilUjianPage() {
@@ -88,82 +106,129 @@ export default function HasilUjianPage() {
     )
   }
 
-  const cheatingDetected = hasil.tab_switch_count > 0 || hasil.fullscreen_exit_count > 0
+  const cheatingDetected = hasil.show_result && (hasil.tab_switch_count > 0 || hasil.fullscreen_exit_count > 0)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 py-12 px-4">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-indigo-900 mb-2">Hasil Ujian</h1>
+          <h1 className="text-3xl font-bold text-indigo-900 mb-2">
+            {hasil.show_result ? 'Hasil Ujian' : 'Terima Kasih'}
+          </h1>
           <p className="text-gray-600">{hasil.ujian.judul}</p>
         </div>
 
-        <Card className="overflow-hidden border-2 border-indigo-100 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center py-8">
-            {hasil.show_result && hasil.nilai !== null ? (
-              <>
-                <Award className="w-16 h-16 mx-auto mb-4 opacity-90" />
-                <CardTitle className="text-4xl font-bold">
-                  {Math.round(hasil.nilai)}
-                </CardTitle>
-                <CardDescription className="text-indigo-100 text-lg">
-                  Nilai Anda
-                </CardDescription>
-              </>
-            ) : (
-              <>
-                <CardTitle className="text-2xl">Hasil Belum Diumumkan</CardTitle>
-                <CardDescription className="text-indigo-100 mt-2">
-                  Guru belum mengumumkan nilai untuk ujian ini
-                </CardDescription>
-              </>
-            )}
-          </CardHeader>
-
-          <CardContent className="p-6">
-            <div className="grid grid-cols-2 gap-4 mb-6">
-              <div className="bg-green-50 rounded-lg p-4 text-center border border-green-100">
-                <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-green-700">{hasil.jumlah_benar}</p>
-                <p className="text-sm text-green-600">Benar</p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-4 text-center border border-red-100">
-                <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-                <p className="text-2xl font-bold text-red-700">{hasil.jumlah_salah}</p>
-                <p className="text-sm text-red-600">Salah</p>
-              </div>
-            </div>
-
-            <div className="text-center text-gray-600 mb-6">
-              <p>Total Soal: <span className="font-semibold">{hasil.jumlah_benar + hasil.jumlah_salah}</span></p>
-            </div>
-
-            {cheatingDetected && (
-              <Alert className="bg-amber-50 border-amber-200 mb-6">
-                <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <AlertDescription className="text-amber-800">
-                  <p className="font-semibold mb-1">Peringatan Pelanggaran</p>
-                  <p className="text-sm">
-                    {hasil.tab_switch_count > 0 && (
-                      <span>Terdeteksi {hasil.tab_switch_count}x beralih tab. </span>
-                    )}
-                    {hasil.fullscreen_exit_count > 0 && (
-                      <span>Terdeteksi {hasil.fullscreen_exit_count}x keluar fullscreen. </span>
-                    )}
-                    Aktivitas ini telah dicatat dalam sistem.
-                  </p>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            <div className="text-sm text-gray-500 text-center space-y-1">
-              <p>Waktu Mulai: {new Date(hasil.waktu_mulai).toLocaleString('id-ID')}</p>
-              {hasil.waktu_selesai && (
-                <p>Selesai: {new Date(hasil.waktu_selesai).toLocaleString('id-ID')}</p>
+        {hasil.show_result ? (
+          <Card className="overflow-hidden border-2 border-indigo-100 shadow-lg">
+            <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center py-8">
+              {hasil.nilai !== null ? (
+                <>
+                  <Award className="w-16 h-16 mx-auto mb-4 opacity-90" />
+                  <CardTitle className="text-4xl font-bold">
+                    {Math.round(hasil.nilai)}
+                  </CardTitle>
+                  <CardDescription className="text-indigo-100 text-lg">
+                    Nilai Anda
+                  </CardDescription>
+                </>
+              ) : (
+                <>
+                  <CardTitle className="text-2xl">Hasil Belum Diumumkan</CardTitle>
+                  <CardDescription className="text-indigo-100 mt-2">
+                    Guru belum mengumumkan nilai untuk ujian ini
+                  </CardDescription>
+                </>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+
+            <CardContent className="p-6">
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="bg-green-50 rounded-lg p-4 text-center border border-green-100">
+                  <CheckCircle2 className="w-8 h-8 text-green-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-green-700">{hasil.jumlah_benar}</p>
+                  <p className="text-sm text-green-600">Benar</p>
+                </div>
+                <div className="bg-red-50 rounded-lg p-4 text-center border border-red-100">
+                  <XCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold text-red-700">{hasil.jumlah_salah}</p>
+                  <p className="text-sm text-red-600">Salah</p>
+                </div>
+              </div>
+
+              <div className="text-center text-gray-600 mb-6">
+                <p>Total Soal: <span className="font-semibold">{hasil.jumlah_benar + hasil.jumlah_salah}</span></p>
+              </div>
+
+              {cheatingDetected && (
+                <Alert className="bg-amber-50 border-amber-200 mb-6">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <AlertDescription className="text-amber-800">
+                    <p className="font-semibold mb-1">Peringatan Pelanggaran</p>
+                    <p className="text-sm">
+                      {hasil.tab_switch_count > 0 && (
+                        <span>Terdeteksi {hasil.tab_switch_count}x beralih tab. </span>
+                      )}
+                      {hasil.fullscreen_exit_count > 0 && (
+                        <span>Terdeteksi {hasil.fullscreen_exit_count}x keluar fullscreen. </span>
+                      )}
+                      Aktivitas ini telah dicatat dalam sistem.
+                    </p>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="text-sm text-gray-500 text-center space-y-1">
+                <p>Waktu Mulai: {new Date(hasil.waktu_mulai).toLocaleString('id-ID')}</p>
+                {hasil.waktu_selesai && (
+                  <p>Selesai: {new Date(hasil.waktu_selesai).toLocaleString('id-ID')}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="overflow-hidden border-2 border-emerald-100 shadow-lg">
+            <CardContent className="p-8">
+              <div className="text-center space-y-6">
+                <div className="flex justify-center">
+                  <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center">
+                    <PartyPopper className="w-10 h-10 text-emerald-600" />
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-emerald-800 mb-2">
+                    Terima Kasih!
+                  </h2>
+                  <p className="text-gray-600">
+                    Anda telah menyelesaikan ujian <strong>{hasil.ujian.judul}</strong> dengan baik.
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 rounded-lg p-4 space-y-3">
+                  <div className="flex items-center justify-center gap-3 text-gray-700">
+                    <Calendar className="w-5 h-5 text-slate-500" />
+                    <span>Waktu Mulai: {new Date(hasil.waktu_mulai).toLocaleString('id-ID')}</span>
+                  </div>
+                  {hasil.waktu_selesai && (
+                    <div className="flex items-center justify-center gap-3 text-gray-700">
+                      <Clock className="w-5 h-5 text-slate-500" />
+                      <span>Waktu Selesai: {new Date(hasil.waktu_selesai).toLocaleString('id-ID')}</span>
+                    </div>
+                  )}
+                  {hasil.waktu_selesai && (
+                    <div className="flex items-center justify-center gap-3 text-gray-700">
+                      <Clock className="w-5 h-5 text-slate-500" />
+                      <span>Durasi: {formatDuration(hasil.waktu_mulai, hasil.waktu_selesai, hasil.ujian.durasi)}</span>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-sm text-slate-500">
+                  Hasil ujian akan diumumkan oleh guru.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Button
           onClick={() => router.push('/siswa')}
