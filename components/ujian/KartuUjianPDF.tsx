@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
   
   headerSection: {
     flexDirection: 'row',
-    borderBottomWidth: 1,
+    borderBottomWidth: 1.5,
     borderBottomColor: '#000000',
     paddingBottom: 4,
     marginBottom: 4,
@@ -79,45 +79,52 @@ const styles = StyleSheet.create({
     marginRight: 6,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 2,
   },
   logo: {
-    width: 32,
-    height: 32,
+    width: 28,
+    height: 28,
     objectFit: 'contain',
+  },
+  logoPlaceholder: {
+    width: 28,
+    height: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerText: {
     flex: 1,
     justifyContent: 'center',
   },
   headerLine1: {
-    fontSize: 7,
+    fontSize: 6,
     fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
+    textTransform: 'uppercase',
   },
   headerLine2: {
     fontSize: 8,
     fontWeight: 'bold',
     color: '#000000',
     textAlign: 'center',
-  },
-  headerLine3: {
-    fontSize: 5.5,
-    color: '#333333',
-    textAlign: 'center',
+    textTransform: 'uppercase',
   },
   
   titleSection: {
-    borderBottomWidth: 1,
+    borderBottomWidth: 1.5,
     borderBottomColor: '#000000',
     paddingVertical: 3,
     marginBottom: 4,
   },
   titleText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: 'bold',
     textAlign: 'center',
     color: '#000000',
+    textTransform: 'uppercase',
   },
   
   contentSection: {
@@ -129,28 +136,36 @@ const styles = StyleSheet.create({
     paddingRight: 4,
   },
   rightSection: {
-    width: 65,
+    width: 60,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingLeft: 4,
+    borderLeftWidth: 0.5,
+    borderLeftColor: '#999999',
   },
   
   sectionTitle: {
-    fontSize: 6,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 1,
-  },
-  sectionContent: {
-    marginBottom: 4,
-  },
-  rowLabel: {
-    fontSize: 6,
-    color: '#333333',
-  },
-  rowValue: {
     fontSize: 7,
     fontWeight: 'bold',
     color: '#000000',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  
+  infoRow: {
+    flexDirection: 'row',
+    marginBottom: 2,
+  },
+  infoLabel: {
+    fontSize: 6.5,
+    color: '#000000',
+    width: 35,
+  },
+  infoValue: {
+    fontSize: 6.5,
+    fontWeight: 'bold',
+    color: '#000000',
+    flex: 1,
   },
   
   divider: {
@@ -160,40 +175,25 @@ const styles = StyleSheet.create({
   },
   
   qrImage: {
-    width: 55,
-    height: 55,
+    width: 52,
+    height: 52,
   },
   qrPlaceholder: {
-    width: 55,
-    height: 55,
+    width: 52,
+    height: 52,
     backgroundColor: '#E5E5E5',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: '#999999',
   },
   qrLabel: {
     fontSize: 5,
     textAlign: 'center',
-    color: '#666666',
+    color: '#000000',
     marginTop: 2,
     fontWeight: 'bold',
-  },
-  
-  footerSection: {
-    borderTopWidth: 0.5,
-    borderTopColor: '#666666',
-    paddingTop: 2,
-    marginTop: 'auto',
-  },
-  footerLine1: {
-    fontSize: 5,
-    color: '#333333',
-    textAlign: 'center',
-    fontStyle: 'italic',
-  },
-  footerLine2: {
-    fontSize: 5,
-    color: '#333333',
-    textAlign: 'center',
+    textTransform: 'uppercase',
   },
   
   emptyPage: {
@@ -233,45 +233,53 @@ function ExamCard({
     <View style={isLastCard ? styles.lastCard : styles.card}>
       <View style={styles.headerSection}>
         <View style={styles.logoContainer}>
-          {sekolah.logo_url ? (
+          {sekolah.logo_url && sekolah.logo_url.startsWith('data:') ? (
             <Image src={sekolah.logo_url} style={styles.logo} />
           ) : (
-            <View style={[styles.logo, { backgroundColor: '#E5E5E5', justifyContent: 'center', alignItems: 'center' }]}>
-              <Text style={{ fontSize: 8, color: '#999' }}>Logo</Text>
+            <View style={styles.logoPlaceholder}>
+              <Text style={{ fontSize: 5, color: '#666' }}>LOGO</Text>
             </View>
           )}
         </View>
         <View style={styles.headerText}>
           <Text style={styles.headerLine1}>KEMENTERIAN PENDIDIKAN DASAR DAN MENENGAH</Text>
-          <Text style={styles.headerLine2}>{truncateText(sekolah.nama_sekolah, 35)}</Text>
-          <Text style={styles.headerLine3}>KARTU PESERTA UJIAN</Text>
+          <Text style={styles.headerLine2}>{truncateText(sekolah.nama_sekolah.toUpperCase(), 35)}</Text>
         </View>
+      </View>
+
+      <View style={styles.titleSection}>
+        <Text style={styles.titleText}>KARTU PESERTA UJIAN</Text>
       </View>
 
       <View style={styles.contentSection}>
         <View style={styles.leftSection}>
-          <View style={styles.sectionContent}>
+          <View style={{ marginBottom: 3 }}>
             <Text style={styles.sectionTitle}>DATA PESERTA</Text>
-            <View style={{ marginBottom: 1 }}>
-              <Text style={styles.rowLabel}>Nama  : {truncateText(siswa.nama, 22)}</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Nama  :</Text>
+              <Text style={styles.infoValue}>{truncateText(siswa.nama.toUpperCase(), 25)}</Text>
             </View>
-            <View style={{ marginBottom: 1 }}>
-              <Text style={styles.rowLabel}>NISN  : {siswa.nisn}</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>NISN  :</Text>
+              <Text style={styles.infoValue}>{siswa.nisn}</Text>
             </View>
-            <View style={{ marginBottom: 1 }}>
-              <Text style={styles.rowLabel}>Kelas : {siswa.kelas?.nama_kelas || '-'}</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Kelas :</Text>
+              <Text style={styles.infoValue}>{(siswa.kelas?.nama_kelas || '-').toUpperCase()}</Text>
             </View>
           </View>
 
           <View style={styles.divider} />
 
-          <View style={styles.sectionContent}>
+          <View style={{ marginTop: 2 }}>
             <Text style={styles.sectionTitle}>INFORMASI UJIAN</Text>
-            <View style={{ marginBottom: 1 }}>
-              <Text style={styles.rowLabel}>Ujian : {truncateText(ujian.judul, 25)}</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Ujian :</Text>
+              <Text style={styles.infoValue}>{truncateText(ujian.judul.toUpperCase(), 28)}</Text>
             </View>
-            <View style={{ marginBottom: 1 }}>
-              <Text style={styles.rowLabel}>Kode  : {ujian.kode_ujian}</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Kode  :</Text>
+              <Text style={styles.infoValue}>{ujian.kode_ujian}</Text>
             </View>
           </View>
         </View>
@@ -286,11 +294,6 @@ function ExamCard({
           )}
           <Text style={styles.qrLabel}>SCAN TO LOGIN</Text>
         </View>
-      </View>
-
-      <View style={styles.footerSection}>
-        <Text style={styles.footerLine1}>* {truncateText(ujian.judul, 30)}</Text>
-        <Text style={styles.footerLine2}>URL: https://cerdas.eas.biz.id/ujian</Text>
       </View>
     </View>
   )

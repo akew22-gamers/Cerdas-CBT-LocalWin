@@ -16,13 +16,15 @@ import { toast } from "sonner"
 import { pdf } from "@react-pdf/renderer"
 import QRCode from "qrcode"
 import { KartuUjianPDF } from "./KartuUjianPDF"
-import type { KartuUjianData, QRCardData } from "@/types/kartu"
+import type { KartuUjianData } from "@/types/kartu"
 
 interface PrintKartuDialogProps {
   ujianId: string
   ujianJudul: string
   ujianKode: string
 }
+
+const DEFAULT_KEMENDIKDASMEN_LOGO = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NSIgZmlsbD0iIzMzNjZjYyIvPjx0ZXh0IHg9IjUwIiB5PSI2NSIgZm9udC1zaXplPSI0MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPuKchDwvdGV4dD48L3N2Zz4="
 
 export function PrintKartuDialog({ ujianId, ujianJudul, ujianKode }: PrintKartuDialogProps) {
   const [open, setOpen] = useState(false)
@@ -81,6 +83,22 @@ export function PrintKartuDialog({ ujianId, ujianJudul, ujianKode }: PrintKartuD
     }
   }
 
+  const convertImageToBase64 = async (url: string): Promise<string> => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result as string)
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    } catch (error) {
+      console.error("Failed to convert image:", error)
+      return DEFAULT_KEMENDIKDASMEN_LOGO
+    }
+  }
+
   const generateQRCode = async (loginUrl: string): Promise<string> => {
     try {
       const qrDataUrl = await QRCode.toDataURL(loginUrl, {
@@ -113,9 +131,16 @@ export function PrintKartuDialog({ ujianId, ujianJudul, ujianKode }: PrintKartuD
       const studentsWithQR = await Promise.all(
         selectedStudents.map(async (student) => {
           const qrDataUrl = await generateQRCode(student.loginUrl)
+          const logoDataUrl = student.sekolah.logo_url 
+            ? await convertImageToBase64(student.sekolah.logo_url)
+            : DEFAULT_KEMENDIKDASMEN_LOGO
           return {
             ...student,
-            qrData: qrDataUrl
+            qrData: qrDataUrl,
+            sekolah: {
+              ...student.sekolah,
+              logo_url: logoDataUrl
+            }
           }
         })
       )

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { toast } from "sonner"
-import { Eye, EyeOff, QrCode, Keyboard, GraduationCap, ArrowRight } from "lucide-react"
+import { Eye, EyeOff, QrCode, Keyboard, ArrowRight, Camera, X } from "lucide-react"
+import { Html5QrcodeScanner } from "html5-qrcode"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 
 interface UjianLoginPageProps {
   schoolName: string
@@ -23,6 +23,9 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
   const [kodeUjianInput, setKodeUjianInput] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isScanning, setIsScanning] = useState(false)
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null)
+  const scannerContainerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (kodeUjian) {
@@ -32,6 +35,72 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
       setActiveTab("manual")
     }
   }, [siswaId, ujianId, kodeUjian])
+
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear().catch(console.error)
+      }
+    }
+  }, [])
+
+  const onScanSuccess = useCallback((decodedText: string) => {
+    try {
+      const url = new URL(decodedText)
+      const params = url.searchParams
+      
+      const uId = params.get('u')
+      const sId = params.get('s')
+      const kode = params.get('k')
+      
+      if (uId && sId && kode) {
+        toast.success("QR Code berhasil dipindai! Mengarahkan...")
+        const targetUrl = `/ujian?u=${uId}&s=${sId}&k=${kode}`
+        window.location.href = targetUrl
+      } else {
+        toast.error("QR Code tidak valid. Pastikan QR code dari kartu ujian yang benar.")
+      }
+    } catch {
+      toast.error("Gagal membaca QR Code. Silakan coba lagi atau gunakan login manual.")
+    }
+    
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch(console.error)
+      setIsScanning(false)
+    }
+  }, [])
+
+  const onScanFailure = useCallback((error: string) => {
+    console.warn("QR Scan warning:", error)
+  }, [])
+
+  const startScanner = useCallback(() => {
+    if (!scannerContainerRef.current) return
+    
+    setIsScanning(true)
+
+    scannerRef.current = new Html5QrcodeScanner(
+      "qr-reader",
+      {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+        aspectRatio: 1.0,
+        showTorchButtonIfSupported: true,
+        showZoomSliderIfSupported: true,
+      },
+      false
+    )
+
+    scannerRef.current.render(onScanSuccess, onScanFailure)
+  }, [onScanSuccess, onScanFailure])
+
+  const stopScanner = useCallback(() => {
+    if (scannerRef.current) {
+      scannerRef.current.clear().catch(console.error)
+      scannerRef.current = null
+    }
+    setIsScanning(false)
+  }, [])
 
   const validateForm = (): boolean => {
     if (!nisn.trim()) {
@@ -96,179 +165,199 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg shadow-blue-500/25 mb-4">
-          <GraduationCap className="w-6 h-6 text-white" />
-        </div>
         <h2 className="text-xl font-bold text-slate-900">Masuk Ujian</h2>
         <p className="text-sm text-slate-500 mt-1">
           Pilih cara masuk untuk memulai ujian
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "qr" | "manual")}>
-        <TabsList className="grid w-full grid-cols-2 bg-slate-100 p-1">
-          <TabsTrigger
-            value="qr"
-            className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600"
-          >
-            <QrCode className="w-4 h-4" />
-            <span className="text-sm font-medium">Scan QR</span>
-          </TabsTrigger>
-          <TabsTrigger
-            value="manual"
-            className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-blue-600"
-          >
-            <Keyboard className="w-4 h-4" />
-            <span className="text-sm font-medium">Login Manual</span>
-          </TabsTrigger>
-        </TabsList>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => { setActiveTab("qr"); setIsScanning(false); }}
+          className={`
+            relative flex flex-col items-center justify-center p-3 rounded-xl
+            transition-all duration-200 ease-out border
+            ${activeTab === "qr" 
+              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border-transparent" 
+              : "bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200 hover:border-slate-300"
+            }
+          `}
+        >
+          <QrCode className={`w-5 h-5 mb-1.5 ${activeTab === "qr" ? "text-white" : "text-slate-500"}`} />
+          <span className="text-xs font-semibold">Scan QR</span>
+          {activeTab === "qr" && <div className="absolute inset-0 rounded-xl ring-2 ring-white/50" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setActiveTab("manual"); stopScanner(); }}
+          className={`
+            relative flex flex-col items-center justify-center p-3 rounded-xl
+            transition-all duration-200 ease-out border
+            ${activeTab === "manual" 
+              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border-transparent" 
+              : "bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200 hover:border-slate-300"
+            }
+          `}
+        >
+          <Keyboard className={`w-5 h-5 mb-1.5 ${activeTab === "manual" ? "text-white" : "text-slate-500"}`} />
+          <span className="text-xs font-semibold">Login Manual</span>
+          {activeTab === "manual" && <div className="absolute inset-0 rounded-xl ring-2 ring-white/50" />}
+        </button>
+      </div>
 
-        <TabsContent value="qr" className="mt-6">
-          <div className="flex flex-col items-center justify-center py-8">
-            <div className="relative w-48 h-48 bg-gradient-to-br from-slate-50 to-slate-100 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center mb-6">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-indigo-500/5 rounded-2xl" />
-              <div className="relative text-center">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-200/80 mb-3">
-                  <QrCode className="w-8 h-8 text-slate-400" />
+      <div className="p-4 rounded-xl border bg-emerald-50/50 border-emerald-200">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-emerald-100 text-emerald-600 flex-shrink-0">
+            <Camera className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-xs text-slate-600 leading-relaxed">
+              {activeTab === "qr" 
+                ? "Arahkan kamera ke QR code pada kartu ujian Anda untuk masuk secara otomatis"
+                : "Masukkan NISN, password, dan kode ujian yang tertera pada kartu ujian Anda"
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {activeTab === "qr" && (
+        <div className="space-y-4">
+          {!isScanning ? (
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-full aspect-square max-w-xs bg-slate-100 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-300">
+                <div className="text-center p-4">
+                  <QrCode className="w-16 h-16 text-slate-400 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">Klik tombol di bawah untuk memulai pemindaian QR</p>
                 </div>
               </div>
-              <div className="absolute top-3 left-3 w-6 h-6 border-t-3 border-l-3 border-blue-500 rounded-tl-lg" />
-              <div className="absolute top-3 right-3 w-6 h-6 border-t-3 border-r-3 border-blue-500 rounded-tr-lg" />
-              <div className="absolute bottom-3 left-3 w-6 h-6 border-b-3 border-l-3 border-blue-500 rounded-bl-lg" />
-              <div className="absolute bottom-3 right-3 w-6 h-6 border-b-3 border-r-3 border-blue-500 rounded-br-lg" />
+              <Button
+                onClick={startScanner}
+                className="w-full max-w-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Mulai Scan QR
+              </Button>
             </div>
-
-            <div className="text-center max-w-xs">
-              <h3 className="text-sm font-semibold text-slate-900 mb-2">
-                Scan Kartu Ujian
-              </h3>
-              <p className="text-xs text-slate-500 leading-relaxed mb-4">
-                Arahkan kamera ke QR code pada kartu ujian Anda untuk masuk secara otomatis
-              </p>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 border border-amber-200 rounded-lg">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="text-xs font-medium text-amber-700">
-                  Fitur scan QR akan tersedia segera
-                </span>
-              </div>
+          ) : (
+            <div className="space-y-4">
+              <div id="qr-reader" ref={scannerContainerRef} className="w-full max-w-xs mx-auto" />
+              <Button
+                variant="outline"
+                onClick={stopScanner}
+                className="w-full max-w-xs mx-auto"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Batalkan Scan
+              </Button>
             </div>
+          )}
+        </div>
+      )}
 
-            <div className="mt-6 pt-6 border-t border-slate-200 w-full">
+      {activeTab === "manual" && (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="nisn" className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              NISN
+            </Label>
+            <Input
+              id="nisn"
+              type="text"
+              placeholder="Masukkan NISN Anda"
+              value={nisn}
+              onChange={(e) => setNisn(e.target.value)}
+              disabled={isLoading}
+              className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 transition-all"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password" className="text-sm font-medium text-slate-700">
+              Password
+            </Label>
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Masukkan password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className="h-11 pr-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 transition-all"
+              />
               <button
                 type="button"
-                onClick={() => setActiveTab("manual")}
-                className="w-full flex items-center justify-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
+                tabIndex={-1}
               >
-                <span>Atau masuk dengan NISN</span>
-                <ArrowRight className="w-4 h-4" />
+                {showPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
               </button>
             </div>
           </div>
-        </TabsContent>
 
-        <TabsContent value="manual" className="mt-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="nisn" className="text-sm font-medium text-slate-700">
-                NISN
-              </Label>
-              <Input
-                id="nisn"
-                type="text"
-                placeholder="Masukkan NISN Anda"
-                value={nisn}
-                onChange={(e) => setNisn(e.target.value)}
-                disabled={isLoading}
-                className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 transition-all"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-slate-700">
-                Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Masukkan password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  disabled={isLoading}
-                  className="h-11 pr-10 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors focus:outline-none"
-                  tabIndex={-1}
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-4 h-4" />
-                  ) : (
-                    <Eye className="w-4 h-4" />
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="kode_ujian" className="text-sm font-medium text-slate-700">
-                Kode Ujian
-              </Label>
-              <Input
-                id="kode_ujian"
-                type="text"
-                placeholder="Masukkan kode ujian"
-                value={kodeUjianInput}
-                onChange={(e) => setKodeUjianInput(e.target.value.toUpperCase())}
-                disabled={isLoading}
-                className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 transition-all uppercase"
-              />
-              <p className="text-xs text-slate-400">
-                Kode ujian tertera pada kartu ujian Anda
-              </p>
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full h-11 mt-4 text-white font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+          <div className="space-y-2">
+            <Label htmlFor="kode_ujian" className="text-sm font-medium text-slate-700">
+              Kode Ujian
+            </Label>
+            <Input
+              id="kode_ujian"
+              type="text"
+              placeholder="Masukkan kode ujian"
+              value={kodeUjianInput}
+              onChange={(e) => setKodeUjianInput(e.target.value.toUpperCase())}
               disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <svg
-                    className="animate-spin h-4 w-4"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    />
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  Memuat...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  Masuk Ujian
-                  <ArrowRight className="w-4 h-4" />
-                </span>
-              )}
-            </Button>
-          </form>
-        </TabsContent>
-      </Tabs>
+              className="h-11 bg-slate-50 border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-blue-500/20 transition-all uppercase"
+            />
+            <p className="text-xs text-slate-400">
+              Kode ujian tertera pada kartu ujian Anda
+            </p>
+          </div>
+
+          <Button
+            type="submit"
+            className="w-full h-11 text-white font-semibold shadow-lg shadow-blue-500/25 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <span className="flex items-center gap-2">
+                <svg
+                  className="animate-spin h-4 w-4"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+                Memuat...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                Masuk Ujian
+                <ArrowRight className="w-4 h-4" />
+              </span>
+            )}
+          </Button>
+        </form>
+      )}
 
       <div className="text-center pt-2">
         <p className="text-xs text-slate-400">
