@@ -44,6 +44,12 @@ export interface UseIdleTimeoutOptions {
   
   /** Skip idle check if no activity ever (default: false) */
   requireInitialActivity?: boolean
+  
+  /** Enable server-side session validation (default: true) */
+  checkServer?: boolean
+  
+  /** Detect mobile device and adjust timeout (default: true) */
+  mobileDetection?: boolean
 }
 
 export interface UseIdleTimeoutReturn {
@@ -111,8 +117,8 @@ export function useIdleTimeout(
   options: UseIdleTimeoutOptions = {}
 ): UseIdleTimeoutReturn {
   const {
-    timeout = 15 * 60 * 1000, // 15 minutes default
-    warningTime = 2 * 60 * 1000, // 2 minutes warning
+    timeout = 15 * 60 * 1000,
+    warningTime = 2 * 60 * 1000,
     onIdle,
     onWarning,
     onTimeout,
@@ -121,13 +127,24 @@ export function useIdleTimeout(
     debug = false,
     redirectUrl = '/login?reason=idle_timeout',
     requireInitialActivity = false,
+    checkServer = true,
+    mobileDetection = true,
   } = options
 
   const router = useRouter()
   
+  // Detect mobile device
+  const isMobile = mobileDetection && (
+    typeof navigator !== 'undefined' &&
+    /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  )
+
+  // Mobile timeout multiplier (2x longer for mobile to account for background tabs)
+  const effectiveTimeout = isMobile ? timeout * 2 : timeout
+  
   const [isIdle, setIsIdle] = useState(false)
   const [isWarning, setIsWarning] = useState(false)
-  const [remainingSeconds, setRemainingSeconds] = useState(Math.floor(timeout / 1000))
+  const [remainingSeconds, setRemainingSeconds] = useState(Math.floor(effectiveTimeout / 1000))
   const [lastActivityAt, setLastActivityAt] = useState<Date | null>(null)
   const [isPaused, setIsPaused] = useState(false)
 
@@ -162,19 +179,59 @@ export function useIdleTimeout(
     }
   }, [])
 
-  const handleTimeout = useCallback(() => {
-    log('Timeout reached - triggering logout')
+  // Validate session with server before redirecting
+  const validateServerSession = useCallback(async (): Promise<boolean> => {
+    if (!checkServer) return true
+
+    try {
+      const response = await fetch('/api/auth/check-session', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const data = await response.json()
+
+      if (data.isActive) {
+        log('Server session valid, resetting timer')
+        return true
+      } else {
+        log(`Server session invalid: ${data.reason}`, data)
+        // Server already invalidated session
+        router.push(`/login?reason=${data.reason}`)
+        return false
+      }
+    } catch (error) {
+      log('Server session check failed, proceeding with logout', error)
+      return true
+    }
+  }, [checkServer, log, router])
+
+  const pingServerActivity = useCallback(async () => {
+    try {
+      await fetch('/api/auth/check-session', {
+        method: 'POST',
+      })
+      log('Server activity updated')
+    } catch (error) {
+      console.error('Failed to ping server activity:', error)
+    }
+  }, [log])
+
+  const handleTimeout = useCallback(async () => {
+    log('Timeout reached - validating with server before logout')
     isIdleRef.current = true
     setIsIdle(true)
     setIsWarning(false)
 
     onTimeout?.()
 
-    // Default redirect
-    setTimeout(() => {
-      router.push(redirectUrl)
-    }, 100)
-  }, [log, onTimeout, router, redirectUrl])
+    const shouldProceed = await validateServerSession()
+    if (shouldProceed) {
+      setTimeout(() => {
+        router.push(redirectUrl)
+      }, 100)
+    }
+  }, [log, onTimeout, router, redirectUrl, validateServerSession])
 
   const startCountdown = useCallback(() => {
     const warningSeconds = Math.floor(warningTime / 1000)
@@ -261,6 +318,27 @@ export function useIdleTimeout(
     setLastActivityAt(new Date())
     handleActivity()
   }, [handleActivity, log])
+
+  // Handle tab visibility changes (background/foreground)
+  useEffect(() => {
+    if (!enabled || !isMobile) return
+
+    const handleVisibilityChange = async () => {
+      if (document.hidden) {
+        log('Tab hidden (background) - pausing idle detection')
+        pause()
+      } else {
+        log('Tab visible (foreground) - resuming detection and updating server')
+        await pingServerActivity()
+        resume()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [enabled, isMobile, pause, resume, pingServerActivity, log])
 
   // Initial setup and event listeners
   useEffect(() => {

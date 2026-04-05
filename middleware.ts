@@ -2,6 +2,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 const SESSION_COOKIE_NAME = 'cbt_session_token'
 const SESSION_CLAIMS_COOKIE_NAME = 'cbt_session_claims'
+const LAST_ACTIVITY_COOKIE_NAME = 'cbt_last_activity'
+
+// Server-side session inactivity timeout (30 minutes default)
+const SERVER_INACTIVITY_TIMEOUT_MS = parseInt(process.env.SESSION_MAX_INACTIVITY_SECONDS || '1800', 10) * 1000
 
 function getSessionSecret(): string {
   return process.env.SESSION_SECRET || process.env.SETUP_TOKEN || 'fallback-secret-change-me'
@@ -11,17 +15,13 @@ function getSessionSecret(): string {
  * Decode base64url string (Web Crypto compatible, no Buffer needed)
  */
 function base64urlDecode(str: string): string {
-  // Convert base64url → base64
   const base64 = str.replace(/-/g, '+').replace(/_/g, '/')
-  // Pad if needed
   const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=')
   return atob(padded)
 }
 
 /**
- * Verifikasi claims cookie menggunakan Web Crypto API (Edge Runtime compatible).
- * Tidak menyentuh database — hanya HMAC verification lokal (~0.1ms).
- * Returns null jika gagal — middleware akan fallback ke session-token-only check.
+ * Verifikasi claims cookie menggunakan Web Crypto API
  */
 async function verifyClaimsFast(
   claims: string
@@ -45,7 +45,6 @@ async function verifyClaimsFast(
       ['verify']
     )
 
-    // Decode base64url signature to bytes
     const sigBinary = base64urlDecode(sig)
     const sigBytes = new Uint8Array(sigBinary.length)
     for (let i = 0; i < sigBinary.length; i++) {
@@ -71,6 +70,35 @@ async function verifyClaimsFast(
   }
 }
 
+/**
+ * Check if session has been inactive for too long (server-side validation)
+ * This works even when client-side idle timer freezes (background tabs, mobile)
+ */
+function checkServerInactivity(
+  request: NextRequest,
+  isAuthenticated: boolean
+): { shouldLogout: boolean; inactiveTimeMs: number } {
+  if (!isAuthenticated) {
+    return { shouldLogout: false, inactiveTimeMs: 0 }
+  }
+
+  const lastActivityCookie = request.cookies.get(LAST_ACTIVITY_COOKIE_NAME)?.value
+  
+  if (!lastActivityCookie) {
+    // No last activity tracked - this is first request or legacy session
+    return { shouldLogout: false, inactiveTimeMs: 0 }
+  }
+
+  const lastActivity = parseInt(lastActivityCookie, 10)
+  const now = Date.now()
+  const inactiveTimeMs = now - lastActivity
+
+  // Check if inactive longer than allowed timeout
+  const shouldLogout = inactiveTimeMs > SERVER_INACTIVITY_TIMEOUT_MS
+
+  return { shouldLogout, inactiveTimeMs }
+}
+
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next({
     request: { headers: request.headers },
@@ -79,15 +107,42 @@ export async function middleware(request: NextRequest) {
   const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value
   const claimsCookie = request.cookies.get(SESSION_CLAIMS_COOKIE_NAME)?.value
 
-  // Autentikasi: cukup cek session token ada (backward compatible dengan sesi lama)
-  // Server Components akan melakukan full DB validation via getSession()
   const isAuthenticated = !!sessionToken
 
-  // Fast role check via claims cookie jika tersedia
   let sessionClaims: { role: string; uid: string } | null = null
   if (sessionToken && claimsCookie) {
     sessionClaims = await verifyClaimsFast(claimsCookie)
   }
+
+  // === SERVER-SIDE INACTIVITY CHECK ===
+  const { shouldLogout, inactiveTimeMs } = checkServerInactivity(request, isAuthenticated)
+
+  if (shouldLogout) {
+    console.log(`[Middleware] Session inactive for ${Math.floor(inactiveTimeMs / 1000)}s - forcing logout`)
+    
+    // Clear session cookies
+    response.cookies.delete(SESSION_COOKIE_NAME)
+    response.cookies.delete(SESSION_CLAIMS_COOKIE_NAME)
+    response.cookies.delete(LAST_ACTIVITY_COOKIE_NAME)
+
+    // Redirect to login with timeout reason
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    url.searchParams.set('reason', 'session_timeout')
+    url.searchParams.set('inactive', Math.floor(inactiveTimeMs / 1000).toString())
+    return NextResponse.redirect(url)
+  }
+
+  // === UPDATE LAST ACTIVITY TIMESTAMP ON EVERY REQUEST ===
+  // This ensures active sessions stay alive, inactive ones expire
+  const now = Date.now()
+  response.cookies.set(LAST_ACTIVITY_COOKIE_NAME, now.toString(), {
+    httpOnly: false, // Client can read this
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: SERVER_INACTIVITY_TIMEOUT_MS / 1000, // Match timeout
+    path: '/',
+  })
 
   const protectedRoutes = ['/dashboard', '/ujian', '/admin', '/guru', '/siswa']
   const publicRoutes = ['/login', '/register']
@@ -108,7 +163,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Role-based routing — hanya jika claims tersedia dan valid
+  // Role-based routing
   if (isAuthenticated && sessionClaims) {
     const role = sessionClaims.role
     const path = request.nextUrl.pathname
@@ -132,7 +187,7 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Redirect dari public route ke dashboard jika sudah login
+  // Redirect from public routes if already logged in
   if ((isPublicRoute || isRootRoute) && isAuthenticated) {
     const url = request.nextUrl.clone()
 
@@ -144,7 +199,6 @@ export async function middleware(request: NextRequest) {
       }
       url.pathname = roleRedirectMap[sessionClaims.role] || '/admin'
     } else {
-      // Tidak ada claims → fallback ke /admin, Server Component akan redirect sesuai role
       url.pathname = '/admin'
     }
     return NextResponse.redirect(url)
