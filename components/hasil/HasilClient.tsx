@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { FileDown, Search, FileText, Loader2 } from "lucide-react"
+import { DetailHasilDialog } from "@/components/guru/DetailHasilDialog"
 
 interface Ujian {
   id: string
@@ -60,6 +61,8 @@ export function HasilClient({ user, ujianList }: HasilClientProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [loadingHasil, setLoadingHasil] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [selectedHasilId, setSelectedHasilId] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   useEffect(() => {
     if (selectedUjian) {
@@ -212,18 +215,34 @@ export function HasilClient({ user, ujianList }: HasilClientProps) {
                       {filteredHasil.map((hasil, index) => (
                         <TableRow key={hasil.id}>
                           <TableCell>{index + 1}</TableCell>
-                          <TableCell className="font-medium">{hasil.siswa.nisn}</TableCell>
-                          <TableCell>{hasil.siswa.nama}</TableCell>
-                          <TableCell>{hasil.kelas}</TableCell>
-                          <TableCell>
-                            <span className={`font-bold ${
-                              hasil.nilai >= 80 ? 'text-green-600' :
-                              hasil.nilai >= 60 ? 'text-yellow-600' :
-                              'text-red-600'
-                            }`}>
-                              {hasil.nilai.toFixed(2)}
-                            </span>
-                          </TableCell>
+<TableCell className="font-medium">{hasil.siswa.nisn}</TableCell>
+                           <TableCell>
+                             <button
+                               onClick={() => {
+                                 setSelectedHasilId(hasil.id)
+                                 setDialogOpen(true)
+                               }}
+                               className="text-left hover:text-blue-600 hover:underline cursor-pointer"
+                             >
+                               {hasil.siswa.nama}
+                             </button>
+                           </TableCell>
+                           <TableCell>{hasil.kelas}</TableCell>
+                           <TableCell>
+                             <button
+                               onClick={() => {
+                                 setSelectedHasilId(hasil.id)
+                                 setDialogOpen(true)
+                               }}
+                               className={`font-bold cursor-pointer hover:underline ${
+                                 hasil.nilai >= 80 ? 'text-green-600' :
+                                 hasil.nilai >= 60 ? 'text-yellow-600' :
+                                 'text-red-600'
+                               }`}
+                             >
+                               {hasil.nilai.toFixed(2)}
+                             </button>
+                           </TableCell>
                           <TableCell>
                             {hasil.waktu_selesai
                               ? new Date(hasil.waktu_selesai).toLocaleString('id-ID')
@@ -259,10 +278,16 @@ export function HasilClient({ user, ujianList }: HasilClientProps) {
                   <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500">Belum ada hasil untuk ujian ini</p>
                 </div>
-              )}
-            </CardContent>
+)}
+        </CardContent>
           </Card>
         )}
+
+        <DetailHasilDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          hasilId={selectedHasilId || ''}
+        />
       </div>
     </DashboardLayout>
   )
