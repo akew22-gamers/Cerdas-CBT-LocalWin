@@ -81,14 +81,19 @@ export function DashboardLayout({ children, user, className }: DashboardLayoutPr
     }
   }, [pause])
 
-  // Stay logged in handler
   const handleStayLoggedIn = React.useCallback(() => {
     reset()
     setShowWarning(false)
     console.log('[IdleTimeout] User stayed logged in - timer reset')
   }, [reset])
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+  const [isMobile, setIsMobile] = React.useState(false)
+  React.useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 640)
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   return (
     <>

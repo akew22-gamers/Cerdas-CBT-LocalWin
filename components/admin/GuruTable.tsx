@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Pencil, Trash2, User, Calendar } from "lucide-react"
 import { ResetPasswordDialog } from "./ResetPasswordDialog"
+import { useState, useEffect } from "react"
 
 interface Guru {
   id: string
@@ -41,7 +42,12 @@ export function GuruTable({ guruList, onRefresh }: GuruTableProps) {
   const router = useRouter()
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false)
   const [selectedGuru, setSelectedGuru] = React.useState<Guru | null>(null)
-  const [isDeleting, setIsDeleting] = React.useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   const handleRefresh = () => {
     if (onRefresh) {
@@ -93,6 +99,7 @@ export function GuruTable({ guruList, onRefresh }: GuruTableProps) {
   }
 
   const formatDate = (dateString: string) => {
+    if (!isHydrated) return '-'
     return new Date(dateString).toLocaleDateString('id-ID', {
       year: 'numeric',
       month: 'long',

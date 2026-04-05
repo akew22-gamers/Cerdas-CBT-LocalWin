@@ -32,6 +32,11 @@ interface GuruDashboardClientProps {
 export function GuruDashboardClient({ initialData, ujianIds, user }: GuruDashboardClientProps) {
   const [recentHasil, setRecentHasil] = useState(initialData.recent_hasil)
   const [sessionCount, setSessionCount] = useState(0)
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   const handleNewResult = useCallback((hasil: HasilUjianData) => {
     if (hasil.nilai !== undefined && hasil.is_submitted) {
@@ -198,7 +203,7 @@ export function GuruDashboardClient({ initialData, ujianIds, user }: GuruDashboa
                           {hasil.nilai}
                         </p>
                         <p className="text-[10px] sm:text-xs text-slate-500">
-                          {hasil.submitted_at
+                          {hasil.submitted_at && isHydrated
                             ? new Date(hasil.submitted_at).toLocaleDateString('id-ID', {
                                 day: 'numeric',
                                 month: 'short',

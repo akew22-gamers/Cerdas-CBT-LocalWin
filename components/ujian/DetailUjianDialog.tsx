@@ -37,8 +37,15 @@ interface DetailUjianDialogProps {
 
 export function DetailUjianDialog({ ujian }: DetailUjianDialogProps) {
   const [isOpen, setIsOpen] = React.useState(false)
+  const [isHydrated, setIsHydrated] = React.useState(false)
+
+  React.useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
 
   const formatDate = (dateString: string) => {
+    if (!isHydrated) return "-"
     return new Date(dateString).toLocaleDateString("id-ID", {
       day: "numeric",
       month: "long",
