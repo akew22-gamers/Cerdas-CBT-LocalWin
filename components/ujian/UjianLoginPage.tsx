@@ -25,7 +25,7 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
   const [isScanning, setIsScanning] = useState(false)
   const [scannerReady, setScannerReady] = useState(false)
   const scannerRef = useRef<any>(null)
-  const scannerInitialized = useRef(false)
+  const isStopping = useRef(false)
 
   useEffect(() => {
     if (kodeUjian) {
@@ -58,56 +58,73 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
       })
   }, [])
 
-  // Initialize/cleanup scanner based on isScanning state
-  useEffect(() => {
-    if (!isScanning) {
-      // Cleanup when scanning stops
-      if (scannerRef.current && scannerInitialized.current) {
-        try {
-          scannerRef.current.clear()
-        } catch (e) {
-          // ignore cleanup errors
+  const stopScanner = useCallback(async () => {
+    if (isStopping.current) return
+    isStopping.current = true
+
+    try {
+      if (scannerRef.current) {
+        const state = scannerRef.current.getState()
+        // State 2 = SCANNING, 3 = PAUSED
+        if (state === 2 || state === 3) {
+          await scannerRef.current.stop()
         }
+        scannerRef.current.clear()
         scannerRef.current = null
-        scannerInitialized.current = false
       }
-      return
+    } catch (e) {
+      // ignore cleanup errors
+      scannerRef.current = null
     }
 
-    // Wait for next frame to ensure DOM is ready
-    const timer = setTimeout(() => {
+    setScannerReady(false)
+    setIsScanning(false)
+    isStopping.current = false
+  }, [])
+
+  // Initialize scanner when isScanning becomes true
+  useEffect(() => {
+    if (!isScanning) return
+
+    let cancelled = false
+
+    const initScanner = async () => {
+      // Small delay to ensure the #qr-reader div is in the DOM
+      await new Promise(r => setTimeout(r, 150))
+
+      if (cancelled) return
       const el = document.getElementById("qr-reader")
-      if (!el || scannerInitialized.current) return
+      if (!el) {
+        setIsScanning(false)
+        return
+      }
 
-      // Dynamically import to avoid SSR issues
-      import("html5-qrcode").then(({ Html5QrcodeScanner }) => {
-        if (!document.getElementById("qr-reader")) return
+      try {
+        // Use Html5Qrcode directly (not Html5QrcodeScanner) for direct camera control
+        const { Html5Qrcode } = await import("html5-qrcode")
+        if (cancelled) return
 
-        const scanner = new Html5QrcodeScanner(
-          "qr-reader",
+        const scanner = new Html5Qrcode("qr-reader")
+        scannerRef.current = scanner
+
+        await scanner.start(
+          { facingMode: "environment" },
           {
             fps: 10,
             qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0,
-            showTorchButtonIfSupported: true,
-            showZoomSliderIfSupported: true,
           },
-          false
-        )
-
-        scannerRef.current = scanner
-        scannerInitialized.current = true
-
-        scanner.render(
           (decodedText: string) => {
-            // Stop scanning immediately
-            try {
+            // QR detected — stop scanner first, then process
+            scanner.stop().then(() => {
               scanner.clear()
-            } catch (e) {
-              // ignore
-            }
-            scannerInitialized.current = false
+              scannerRef.current = null
+            }).catch(() => {
+              scannerRef.current = null
+            })
+
             setIsScanning(false)
+            setScannerReady(false)
 
             // Parse URL
             try {
@@ -126,73 +143,87 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
               toast.error("Gagal membaca QR Code. Gunakan login manual.")
             }
           },
-          (_errorMessage: string) => {
-            // Silent - normal scan miss, don't spam
+          () => {
+            // Scan miss — silent, don't log
           }
         )
 
-        setScannerReady(true)
-      }).catch(() => {
-        toast.error("Gagal memuat scanner QR")
-        setIsScanning(false)
-      })
-    }, 100)
+        if (!cancelled) {
+          setScannerReady(true)
+        }
+      } catch (err: any) {
+        console.error("Scanner init error:", err)
+        if (!cancelled) {
+          toast.error("Gagal membuka kamera. Pastikan izin kamera diaktifkan.")
+          setIsScanning(false)
+        }
+      }
+    }
+
+    initScanner()
 
     return () => {
-      clearTimeout(timer)
+      cancelled = true
     }
   }, [isScanning, handleQrLogin])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (scannerRef.current && scannerInitialized.current) {
+      if (scannerRef.current) {
         try {
+          const state = scannerRef.current.getState()
+          if (state === 2 || state === 3) {
+            scannerRef.current.stop().catch(() => {})
+          }
           scannerRef.current.clear()
         } catch (e) {
           // ignore
         }
+        scannerRef.current = null
       }
     }
   }, [])
 
   const startScanner = useCallback(async () => {
-    // Check if we're in a secure context (HTTPS)
-    if (!window.isSecureContext) {
+    if (isScanning) return
+
+    // Check HTTPS
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
       toast.error("QR Scanner memerlukan HTTPS")
       return
     }
 
-    // Check for mediaDevices support
+    // Check camera API support
     if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
       toast.error("Browser tidak mendukung kamera")
       return
     }
 
     try {
-      // Request camera permissions first
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      // Pre-check camera permission
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      })
+      // Stop the test stream — Html5Qrcode will open its own
       stream.getTracks().forEach(track => track.stop())
 
-      // Now set scanning - this will trigger the useEffect to initialize Html5QrcodeScanner
+      // Set scanning state — this triggers the useEffect above
       setScannerReady(false)
       setIsScanning(true)
     } catch (err: any) {
       console.error("Camera access error:", err)
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        toast.error("Izin kamera ditolak. Silakan aktifkan izin kamera di pengaturan browser.")
-      } else if (err.name === 'NotFoundError') {
+        toast.error("Izin kamera ditolak. Aktifkan izin kamera di pengaturan browser.")
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         toast.error("Kamera tidak ditemukan di perangkat ini.")
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        toast.error("Kamera sedang digunakan aplikasi lain.")
       } else {
         toast.error("Gagal mengakses kamera.")
       }
     }
-  }, [])
-
-  const stopScanner = useCallback(() => {
-    setIsScanning(false)
-    setScannerReady(false)
-  }, [])
+  }, [isScanning])
 
   const validateForm = (): boolean => {
     if (!nisn.trim()) {
@@ -216,7 +247,6 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-
     if (!validateForm()) return
 
     setIsLoading(true)
@@ -224,9 +254,7 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
     try {
       const response = await fetch("/api/ujian/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nisn: nisn.trim(),
           password,
@@ -266,12 +294,12 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
-          onClick={() => { setActiveTab("qr"); stopScanner(); }}
+          onClick={() => { setActiveTab("qr"); if (isScanning) stopScanner(); }}
           className={`
             relative flex flex-col items-center justify-center p-3 rounded-xl
             transition-all duration-200 ease-out border
-            ${activeTab === "qr" 
-              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border-transparent" 
+            ${activeTab === "qr"
+              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border-transparent"
               : "bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200 hover:border-slate-300"
             }
           `}
@@ -286,8 +314,8 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
           className={`
             relative flex flex-col items-center justify-center p-3 rounded-xl
             transition-all duration-200 ease-out border
-            ${activeTab === "manual" 
-              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border-transparent" 
+            ${activeTab === "manual"
+              ? "bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/25 border-transparent"
               : "bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200 hover:border-slate-300"
             }
           `}
@@ -305,7 +333,7 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
           </div>
           <div>
             <p className="text-xs text-slate-600 leading-relaxed">
-              {activeTab === "qr" 
+              {activeTab === "qr"
                 ? "Arahkan kamera ke QR code pada kartu ujian Anda untuk masuk secara otomatis"
                 : "Masukkan NISN, password, dan kode ujian yang tertera pada kartu ujian Anda"
               }
@@ -338,16 +366,17 @@ export function UjianLoginPage({ schoolName, ujianId, siswaId, kodeUjian }: Ujia
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="relative">
-                <div id="qr-reader" className="w-full max-w-xs mx-auto" />
+              <div className="relative rounded-2xl overflow-hidden bg-black">
+                {/* Camera preview renders here */}
+                <div id="qr-reader" className="w-full" />
                 {!scannerReady && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-slate-100 rounded-lg">
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80">
                     <div className="text-center">
-                      <svg className="animate-spin h-8 w-8 text-blue-500 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <svg className="animate-spin h-8 w-8 text-white mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
-                      <p className="text-sm text-slate-500">Memuat kamera...</p>
+                      <p className="text-sm text-white">Membuka kamera...</p>
                     </div>
                   </div>
                 )}
