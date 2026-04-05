@@ -35,7 +35,8 @@ export async function GET(
         seed_opsi,
         is_submitted,
         ujian!inner (
-          durasi
+          durasi,
+          jumlah_opsi
         )
       `)
       .eq('siswa_id', session.user.id)
@@ -58,6 +59,7 @@ export async function GET(
 
     const ujian = hasil.ujian as any
     const durasi = Array.isArray(ujian) ? (ujian[0]?.durasi ?? 60) : (ujian?.durasi ?? 60)
+    const jumlahOpsi = Array.isArray(ujian) ? (ujian[0]?.jumlah_opsi ?? 4) : (ujian?.jumlah_opsi ?? 4)
 
     const { data: soalData, error: soalError } = await supabase
       .from('soal')
@@ -98,7 +100,7 @@ export async function GET(
       const shuffledOptions = shuffleWithSeed(options, optionSeed)
 
       const labels = ['A', 'B', 'C', 'D', 'E']
-      const labeledOptions = shuffledOptions.slice(0, 5).map((opt, idx) => ({
+      const labeledOptions = shuffledOptions.slice(0, jumlahOpsi).map((opt, idx) => ({
         label: labels[idx],
         text: opt.text
       }))

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, CheckCircle2, Eye } from "lucide-react"
+import { Calendar, CheckCircle2, Eye, EyeOff } from "lucide-react"
 import { DetailHasilDialog } from "./DetailHasilDialog"
 
 interface RiwayatCardProps {
@@ -25,11 +25,17 @@ export function RiwayatCard({ id, ujian_judul, nilai, show_result, completed_at 
       })
     : '-'
 
+  const handleCardClick = () => {
+    if (show_result) {
+      setDialogOpen(true)
+    }
+  }
+
   return (
     <>
       <Card 
-        className="cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200 group"
-        onClick={() => setDialogOpen(true)}
+        className={`transition-all duration-200 group ${show_result ? 'cursor-pointer hover:shadow-md hover:border-slate-300' : 'cursor-default opacity-75'}`}
+        onClick={handleCardClick}
       >
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
@@ -56,8 +62,17 @@ export function RiwayatCard({ id, ujian_judul, nilai, show_result, completed_at 
               </div>
             </div>
             <div className="flex items-center gap-1 text-xs text-slate-400 group-hover:text-emerald-500 transition-colors">
-              <Eye className="w-3 h-3" />
-              <span>Lihat</span>
+              {show_result ? (
+                <>
+                  <Eye className="w-3 h-3" />
+                  <span>Lihat</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-3 h-3" />
+                  <span>Tersembunyi</span>
+                </>
+              )}
             </div>
           </div>
           {!show_result && (
@@ -68,11 +83,13 @@ export function RiwayatCard({ id, ujian_judul, nilai, show_result, completed_at 
         </CardContent>
       </Card>
 
-      <DetailHasilDialog 
-        open={dialogOpen} 
-        onOpenChange={setDialogOpen} 
-        hasilId={id}
-      />
+      {show_result && (
+        <DetailHasilDialog 
+          open={dialogOpen} 
+          onOpenChange={setDialogOpen} 
+          hasilId={id}
+        />
+      )}
     </>
   )
 }
