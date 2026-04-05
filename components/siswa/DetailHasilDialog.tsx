@@ -18,7 +18,8 @@ import {
   XCircle,
   Trophy,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  PartyPopper
 } from "lucide-react"
 
 interface DetailHasilDialogProps {
@@ -158,102 +159,112 @@ export function DetailHasilDialog({ open, onOpenChange, hasilId }: DetailHasilDi
               </div>
             </div>
 
-            {data.show_result && data.nilai !== null ? (
-              <div className="flex items-center justify-center py-4">
-                <div className={`flex flex-col items-center gap-2 px-8 py-6 rounded-2xl ${getGradeBgColor(data.nilai)}`}>
-                  <Trophy className={`h-8 w-8 ${getGradeColor(data.nilai)}`} />
-                  <span className={`text-4xl font-bold ${getGradeColor(data.nilai)}`}>
-                    {Math.round(data.nilai)}
-                  </span>
-                  <span className="text-sm text-slate-600">Nilai</span>
+            {data.show_result ? (
+              <>
+                <div className="flex items-center justify-center py-4">
+                  <div className={`flex flex-col items-center gap-2 px-8 py-6 rounded-2xl ${getGradeBgColor(data.nilai || 0)}`}>
+                    <Trophy className={`h-8 w-8 ${getGradeColor(data.nilai || 0)}`} />
+                    <span className={`text-4xl font-bold ${getGradeColor(data.nilai || 0)}`}>
+                      {Math.round(data.nilai || 0)}
+                    </span>
+                    <span className="text-sm text-slate-600">Nilai</span>
+                  </div>
                 </div>
-              </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <span className="text-xs text-emerald-600 font-medium">Jawaban Benar</span>
+                    </div>
+                    <p className="text-2xl font-bold text-emerald-700">
+                      {data.jumlah_benar}
+                    </p>
+                    <p className="text-xs text-emerald-500 mt-1">
+                      dari {data.total_soal} soal
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <XCircle className="h-4 w-4 text-red-600" />
+                      <span className="text-xs text-red-600 font-medium">Jawaban Salah</span>
+                    </div>
+                    <p className="text-2xl font-bold text-red-700">
+                      {data.jumlah_salah}
+                    </p>
+                    <p className="text-xs text-red-500 mt-1">
+                      dari {data.total_soal} soal
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <Calendar className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Tanggal Ujian</p>
+                      <p className="font-medium text-slate-900">
+                        {formatDate(data.waktu_mulai)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <PlayCircle className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Waktu Mulai</p>
+                      <p className="font-medium text-slate-900">
+                        {formatTime(data.waktu_mulai)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <StopCircle className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Waktu Selesai</p>
+                      <p className="font-medium text-slate-900">
+                        {formatTime(data.waktu_selesai)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
+                      <Clock className="h-4 w-4 text-slate-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-slate-500">Waktu Pengerjaan</p>
+                      <p className="font-medium text-slate-900">
+                        {formatDuration(data.waktu_mulai, data.waktu_selesai, data.durasi)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
             ) : (
-              <div className="flex items-center justify-center py-4">
-                <div className="flex flex-col items-center gap-2 px-8 py-6 rounded-2xl bg-slate-100">
-                  <AlertCircle className="h-8 w-8 text-slate-400" />
-                  <span className="text-sm text-slate-500">Hasil tidak ditampilkan</span>
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="flex flex-col items-center gap-4 px-8 py-6 rounded-2xl bg-emerald-50 border border-emerald-200">
+                  <PartyPopper className="h-12 w-12 text-emerald-600" />
+                  <h4 className="text-lg font-semibold text-emerald-800">
+                    Terima Kasih!
+                  </h4>
+                  <p className="text-sm text-emerald-700 max-w-xs">
+                    Anda telah menyelesaikan ujian <strong>{data.ujian_judul}</strong> dengan baik.
+                  </p>
+                  <p className="text-xs text-emerald-600">
+                    Hasil ujian tidak ditampilkan oleh guru.
+                  </p>
                 </div>
               </div>
             )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs text-emerald-600 font-medium">Jawaban Benar</span>
-                </div>
-                <p className="text-2xl font-bold text-emerald-700">
-                  {data.jumlah_benar}
-                </p>
-                <p className="text-xs text-emerald-500 mt-1">
-                  dari {data.total_soal} soal
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-red-200 bg-red-50/50 p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <XCircle className="h-4 w-4 text-red-600" />
-                  <span className="text-xs text-red-600 font-medium">Jawaban Salah</span>
-                </div>
-                <p className="text-2xl font-bold text-red-700">
-                  {data.jumlah_salah}
-                </p>
-                <p className="text-xs text-red-500 mt-1">
-                  dari {data.total_soal} soal
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                  <Calendar className="h-4 w-4 text-slate-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Tanggal Ujian</p>
-                  <p className="font-medium text-slate-900">
-                    {formatDate(data.waktu_mulai)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                  <PlayCircle className="h-4 w-4 text-slate-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Waktu Mulai</p>
-                  <p className="font-medium text-slate-900">
-                    {formatTime(data.waktu_mulai)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                  <StopCircle className="h-4 w-4 text-slate-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Waktu Selesai</p>
-                  <p className="font-medium text-slate-900">
-                    {formatTime(data.waktu_selesai)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-                  <Clock className="h-4 w-4 text-slate-600" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs text-slate-500">Waktu Pengerjaan</p>
-                  <p className="font-medium text-slate-900">
-                    {formatDuration(data.waktu_mulai, data.waktu_selesai, data.durasi)}
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         ) : null}
 
