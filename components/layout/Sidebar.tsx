@@ -131,7 +131,7 @@ export function Sidebar({ role, className }: SidebarProps) {
       </div>
 
       {/* Navigation - Touch-optimized */}
-      <nav className="flex-1 py-4 overflow-y-auto">
+      <nav className="flex-1 py-4 overflow-y-auto z-10">
         {navSections.map((section, sectionIndex) => (
           <div key={sectionIndex} className="mb-5">
             {section.title && (
@@ -153,6 +153,7 @@ export function Sidebar({ role, className }: SidebarProps) {
                       
                       // Touch target - minimum 44px height
                       'min-h-[44px]',
+                      'relative',
                       
                       // Active state with gradient
                       active
@@ -160,7 +161,9 @@ export function Sidebar({ role, className }: SidebarProps) {
                         : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900',
                       
                       // Press effect
-                      'active:scale-[0.98]'
+                      'active:scale-[0.98]',
+                      // Ensure clickable
+                      'z-10 pointer-events-auto'
                     )}
                   >
                     {/* Icon */}
@@ -225,8 +228,7 @@ export function Sidebar({ role, className }: SidebarProps) {
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 animate-in fade-in duration-200"
-          onClick={() => setMobileOpen(false)}
+          className="lg:hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 animate-in fade-in duration-200 pointer-events-none"
           aria-hidden="true"
         />
       )}
