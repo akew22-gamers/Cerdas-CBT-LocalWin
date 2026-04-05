@@ -78,11 +78,11 @@ export async function GET(
         ujian_judul: (ujian as any).judul,
         durasi: (ujian as any).durasi,
         nilai: showResult ? Math.round(hasil.nilai * 100) / 100 : null,
-        jumlah_benar: hasil.jumlah_benar,
-        jumlah_salah: hasil.jumlah_salah,
-        total_soal: totalSoal || 0,
-        waktu_mulai: hasil.waktu_mulai,
-        waktu_selesai: hasil.waktu_selesai,
+        jumlah_benar: showResult ? hasil.jumlah_benar : 0,
+        jumlah_salah: showResult ? hasil.jumlah_salah : 0,
+        total_soal: showResult ? totalSoal || 0 : 0,
+        waktu_mulai: showResult ? hasil.waktu_mulai : null,
+        waktu_selesai: showResult ? hasil.waktu_selesai : null,
         show_result: showResult,
         is_submitted: hasil.is_submitted
       }
