@@ -79,9 +79,6 @@ const styles = StyleSheet.create({
     marginRight: 6,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#000000',
-    borderRadius: 2,
   },
   logo: {
     width: 28,

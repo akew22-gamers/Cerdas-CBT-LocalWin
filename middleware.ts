@@ -187,8 +187,9 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Redirect from public routes if already logged in
-  if ((isPublicRoute || isRootRoute) && isAuthenticated) {
+  // Redirect from public routes if already logged in (except /ujian which is always accessible)
+  const isUjianRoute = request.nextUrl.pathname === '/ujian' || request.nextUrl.pathname.startsWith('/ujian/')
+  if ((isPublicRoute || isRootRoute) && isAuthenticated && !isUjianRoute) {
     const url = request.nextUrl.clone()
 
     if (sessionClaims) {
