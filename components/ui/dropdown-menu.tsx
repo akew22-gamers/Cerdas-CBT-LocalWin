@@ -19,10 +19,10 @@ function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
 }
 
 function DropdownMenuContent({
-  align = "start",
-  alignOffset = 0,
+  align = "end",
+  alignOffset = 4,
   side = "bottom",
-  sideOffset = 4,
+  sideOffset = 8,
   className,
   ...props
 }: MenuPrimitive.Popup.Props &
@@ -33,23 +33,17 @@ function DropdownMenuContent({
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
-        data-slot="dropdown-menu-positioner"
-        className="isolate z-50 outline-none"
-        align={align}
-        alignOffset={alignOffset}
         side={side}
+        align={align}
         sideOffset={sideOffset}
+        alignOffset={alignOffset}
       >
         <MenuPrimitive.Popup
-          data-slot="dropdown-menu-content"
+          {...props}
           className={cn(
             "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out",
-            "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-            "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
             className
           )}
-          {...props}
         />
       </MenuPrimitive.Positioner>
     </MenuPrimitive.Portal>
