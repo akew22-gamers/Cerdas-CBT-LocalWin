@@ -2,13 +2,13 @@
 
 import { useState } from "react"
 import { toast } from "sonner"
-import { Eye, EyeOff, GraduationCap, School, Shield, User, ChevronRight } from "lucide-react"
+import { Eye, EyeOff, GraduationCap, School, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
-type UserRole = "super_admin" | "guru" | "siswa"
+type UserRole = "guru" | "siswa"
 
 interface LoginFormProps {
   schoolName: string
@@ -16,20 +16,12 @@ interface LoginFormProps {
 
 const roleConfig: Record<UserRole, {
   label: string
-  icon: typeof Shield
+  icon: typeof School | typeof GraduationCap
   title: string
   description: string
   gradient: string
   accent: string
 }> = {
-  super_admin: {
-    label: "Super Admin",
-    icon: Shield,
-    title: "Super Admin",
-    description: "Akses penuh sistem dan manajemen",
-    gradient: "from-violet-500 to-purple-600",
-    accent: "violet",
-  },
   guru: {
     label: "Guru",
     icon: School,
@@ -103,8 +95,6 @@ export function LoginForm({ schoolName }: LoginFormProps) {
       let redirectPath = "/siswa"
       if (userRole === "guru") {
         redirectPath = "/guru"
-      } else if (userRole === "super_admin") {
-        redirectPath = "/admin"
       }
 
       window.location.href = redirectPath
@@ -127,8 +117,6 @@ export function LoginForm({ schoolName }: LoginFormProps) {
         return "NISN"
       case "guru":
         return "Username Guru"
-      case "super_admin":
-        return "Username Super Admin"
       default:
         return "Username"
     }
@@ -140,8 +128,6 @@ export function LoginForm({ schoolName }: LoginFormProps) {
         return "Masukkan NISN Anda"
       case "guru":
         return "Masukkan username guru"
-      case "super_admin":
-        return "Masukkan username super admin"
       default:
         return "Masukkan username"
     }
@@ -187,19 +173,10 @@ export function LoginForm({ schoolName }: LoginFormProps) {
           </div>
         </div>
 
-        <div className={`
-          p-4 rounded-xl border transition-all duration-300
-          ${role === 'super_admin' ? 'bg-violet-50/50 border-violet-200' : ''}
-          ${role === 'guru' ? 'bg-blue-50/50 border-blue-200' : ''}
-          ${role === 'siswa' ? 'bg-emerald-50/50 border-emerald-200' : ''}
-        `}>
+        <div className="p-4 rounded-xl border transition-all duration-300
+          bg-slate-50/50 border-slate-200">
           <div className="flex items-start gap-3">
-            <div className={`
-              p-2 rounded-lg flex-shrink-0
-              ${role === 'super_admin' ? 'bg-violet-100 text-violet-600' : ''}
-              ${role === 'guru' ? 'bg-blue-100 text-blue-600' : ''}
-              ${role === 'siswa' ? 'bg-emerald-100 text-emerald-600' : ''}
-            `}>
+            <div className="p-2 rounded-lg flex-shrink-0 bg-slate-100 text-slate-600">
               <currentRole.icon className="w-4 h-4" />
             </div>
             <div>
@@ -212,7 +189,7 @@ export function LoginForm({ schoolName }: LoginFormProps) {
         <div className="space-y-4 pt-2">
           <div className="space-y-2">
             <Label htmlFor="username" className="text-sm font-medium text-slate-700 flex items-center gap-2">
-              <User className="w-3.5 h-3.5 text-slate-400" />
+              <School className="w-3.5 h-3.5 text-slate-400" />
               {getUsernameLabel()}
             </Label>
             <Input
@@ -270,17 +247,16 @@ export function LoginForm({ schoolName }: LoginFormProps) {
         </a>
       </div>
 
-      <Button
-        type="submit"
-        className={`
-          w-full h-11 text-white font-semibold shadow-lg transition-all duration-200
-          hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]
-          ${role === 'super_admin' ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 shadow-violet-500/25' : ''}
-          ${role === 'guru' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/25' : ''}
-          ${role === 'siswa' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/25' : ''}
-        `}
-        disabled={isLoading}
-      >
+        <Button
+          type="submit"
+          className={`
+            w-full h-11 text-white font-semibold shadow-lg transition-all duration-200
+            hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]
+            ${role === 'guru' ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-500/25' : ''}
+            ${role === 'siswa' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/25' : ''}
+          `}
+          disabled={isLoading}
+        >
         {isLoading ? (
           <span className="flex items-center gap-2">
             <svg
