@@ -43,14 +43,8 @@ export async function GET(request: Request, { params }: RouteParams) {
 
     return NextResponse.json({
       success: true,
-      data: {
-        soal: {
-          ...soal,
-          ujian_status: soal.ujian.status
-        }
-      }
+      data: soal
     })
-
   } catch (error) {
     console.error('Get soal error:', error)
     return NextResponse.json(
