@@ -198,7 +198,7 @@ export function PrintKartuDialog({ ujianId, ujianJudul, ujianKode }: PrintKartuD
           <Button
             variant="outline"
             size="sm"
-            className="gap-1"
+            className="gap-1 bg-green-600 text-white hover:bg-green-700 border-green-700 hover:border-green-800"
           >
             <Printer className="h-4 w-4" />
             <span>Cetak Kartu</span>

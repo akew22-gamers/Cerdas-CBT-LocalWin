@@ -174,27 +174,30 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
               className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200 overflow-hidden"
             >
               <div className="p-4 border-b border-gray-100">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className="text-xs font-mono font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
-                        {ujian.kode_ujian}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          ujian.status === "aktif"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {ujian.status === "aktif" ? "Aktif" : "Nonaktif"}
-                      </span>
-                    </div>
-                    <h3 className="font-semibold text-gray-900 truncate" title={ujian.judul}>
-                      {ujian.judul}
-                    </h3>
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-medium text-purple-600 bg-purple-50 px-2 py-0.5 rounded">
+                      {ujian.kode_ujian}
+                    </span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        ujian.status === "aktif"
+                          ? "bg-green-100 text-green-700"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                    >
+                      {ujian.status === "aktif" ? "Aktif" : "Nonaktif"}
+                    </span>
                   </div>
+                  <PrintKartuDialog
+                    ujianId={ujian.id}
+                    ujianJudul={ujian.judul}
+                    ujianKode={ujian.kode_ujian}
+                  />
                 </div>
+                <h3 className="font-semibold text-gray-900 truncate" title={ujian.judul}>
+                  {ujian.judul}
+                </h3>
               </div>
 
               <div className="p-4 space-y-3">
@@ -239,11 +242,6 @@ export function UjianTable({ data, onDelete, onToggle }: UjianTableProps) {
                       onAssignSuccess={() => router.refresh()}
                     />
                     <EditUjianDialog ujian={ujian} onUpdated={onDelete || onToggle} />
-                    <PrintKartuDialog
-                      ujianId={ujian.id}
-                      ujianJudul={ujian.judul}
-                      ujianKode={ujian.kode_ujian}
-                    />
 
                     <Button
                       variant="outline"
