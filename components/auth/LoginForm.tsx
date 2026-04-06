@@ -138,43 +138,39 @@ export function LoginForm({ schoolName }: LoginFormProps) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="space-y-4">
-        <div>
-          <Label className="text-sm font-medium text-slate-700 mb-3 block">
-            Pilih Peran
-          </Label>
-          <div className="grid grid-cols-3 gap-2">
-            {(Object.keys(roleConfig) as UserRole[]).map((roleKey) => {
-              const config = roleConfig[roleKey]
-              const isActive = role === roleKey
-              const Icon = config.icon
-              
-              return (
-                <button
-                  key={roleKey}
-                  type="button"
-                  onClick={() => handleRoleChange(roleKey)}
-                  className={`
-                    relative group flex flex-col items-center justify-center p-3 rounded-xl
-                    transition-all duration-200 ease-out
-                    ${isActive 
-                      ? `bg-gradient-to-br ${config.gradient} text-white shadow-lg shadow-${config.accent}-500/25 scale-[1.02]` 
-                      : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200 hover:border-slate-300'
-                    }
-                  `}
-                >
-                  <Icon className={`w-5 h-5 mb-2 ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-600'}`} />
-                  <span className="text-xs font-semibold leading-tight">{config.label}</span>
-                  {isActive && (
-                    <div className="absolute inset-0 rounded-xl ring-2 ring-white/50" />
-                  )}
-                </button>
-              )
-            })}
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          {(Object.keys(roleConfig) as UserRole[]).map((roleKey) => {
+            const config = roleConfig[roleKey]
+            const isActive = role === roleKey
+            const Icon = config.icon
+            
+            return (
+              <button
+                key={roleKey}
+                type="button"
+                onClick={() => handleRoleChange(roleKey)}
+                className={`
+                  relative group flex items-center justify-center gap-3 p-4 rounded-xl
+                  transition-all duration-200 ease-out border-2
+                  ${isActive 
+                    ? `bg-gradient-to-br ${config.gradient} border-transparent text-white shadow-lg shadow-${config.accent}-500/25 scale-[1.02]` 
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
+                  }
+                `}
+              >
+                <div className={`p-2 rounded-lg ${isActive ? 'bg-white/20' : 'bg-slate-100'}`}>
+                  <Icon className={`w-6 h-6 ${isActive ? 'text-white' : 'text-slate-600'}`} />
+                </div>
+                <span className="font-semibold text-lg">{config.label}</span>
+                {isActive && (
+                  <div className="absolute inset-0 rounded-xl ring-2 ring-white/50" />
+                )}
+              </button>
+            )
+          })}
         </div>
 
-        <div className="p-4 rounded-xl border transition-all duration-300
-          bg-slate-50/50 border-slate-200">
+        <div className="p-4 rounded-xl border transition-all duration-300 bg-slate-50/50 border-slate-200">
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-lg flex-shrink-0 bg-slate-100 text-slate-600">
               <currentRole.icon className="w-4 h-4" />
