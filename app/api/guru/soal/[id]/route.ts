@@ -6,29 +6,20 @@ interface RouteParams {
   params: Promise<{ id: string }>
 }
 
-// GET /api/guru/soal/[id] - Get single soal
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const session = await getSession()
 
-    if (!session) {
+    if (!session || session.user.role !== 'guru') {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
-        { status: 401 }
-      )
-    }
-
-    if (session.user.role !== 'guru') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
-        { status: 403 }
+        { success: false, error: { code: session ? 'FORBIDDEN' : 'UNAUTHORIZED', message: session ? 'Akses ditolak' : 'Tidak terautentikasi' } },
+        { status: session ? 403 : 401 }
       )
     }
 
     const supabase = createAdminClient()
     const { id } = await params
 
-    // Get soal with ujian info
     const { data: soal, error } = await supabase
       .from('soal')
       .select(`
@@ -43,19 +34,10 @@ export async function GET(request: Request, { params }: RouteParams) {
       .eq('id', id)
       .single()
 
-    if (error || !soal) {
-      console.error('Error fetching soal:', error)
+    if (error || !soal || !soal.ujian || soal.ujian.created_by !== session.user.id) {
       return NextResponse.json(
-        { success: false, error: { code: 'NOT_FOUND', message: 'Soal tidak ditemukan' } },
-        { status: 404 }
-      )
-    }
-
-    // Verify user owns this soal (check ujian created_by)
-    if (!soal.ujian || soal.ujian.created_by !== session.user.id) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke soal ini' } },
-        { status: 403 }
+        { success: false, error: { code: error || !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: error || !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
+        { status: error || !soal ? 404 : 403 }
       )
     }
 
@@ -78,33 +60,22 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// PUT /api/guru/soal/[id] - Update soal
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const session = await getSession()
 
-    if (!session) {
+    if (!session || session.user.role !== 'guru') {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
-        { status: 401 }
-      )
-    }
-
-    if (session.user.role !== 'guru') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
-        { status: 403 }
+        { success: false, error: { code: session ? 'FORBIDDEN' : 'UNAUTHORIZED', message: session ? 'Akses ditolak' : 'Tidak terautentikasi' } },
+        { status: session ? 403 : 401 }
       )
     }
 
     const supabase = createAdminClient()
     const { id } = await params
-
-    // Parse request body
     const body = await request.json()
     const { teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan } = body
 
-    // Validation
     if (!teks_soal || !jawaban_benar || !pengecoh_1 || !pengecoh_2) {
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'teks_soal, jawaban_benar, pengecoh_1, dan pengecoh_2 harus diisi' } },
@@ -112,15 +83,26 @@ export async function PUT(request: Request, { params }: RouteParams) {
       )
     }
 
-    // Verify user owns this soal
-    if (!soal.ujian || soal.ujian.created_by !== session.user.id) {
+    const { data: soal, error: fetchError } = await supabase
+      .from('soal')
+      .select(`
+        *,
+        ujian:ujian_id (
+          id,
+          status,
+          created_by
+        )
+      `)
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !soal || !soal.ujian || soal.ujian.created_by !== session.user.id) {
       return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke soal ini' } },
-        { status: 403 }
+        { success: false, error: { code: fetchError || !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: fetchError || !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
+        { status: fetchError || !soal ? 404 : 403 }
       )
     }
 
-    // Check if ujian is active
     if (soal.ujian.status === 'aktif') {
       return NextResponse.json(
         { success: false, error: { code: 'UJIAN_ACTIVE', message: 'Soal tidak dapat diubah karena ujian sedang aktif' } },
@@ -128,7 +110,6 @@ export async function PUT(request: Request, { params }: RouteParams) {
       )
     }
 
-    // Update soal
     const { data: updatedSoal, error } = await supabase
       .from('soal')
       .update({
@@ -146,14 +127,12 @@ export async function PUT(request: Request, { params }: RouteParams) {
       .single()
 
     if (error) {
-      console.error('Error updating soal:', error)
       return NextResponse.json(
         { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
         { status: 500 }
       )
     }
 
-    // Log audit
     await supabase.from('audit_log').insert({
       user_id: session.user.id,
       role: 'guru',
@@ -179,29 +158,20 @@ export async function PUT(request: Request, { params }: RouteParams) {
   }
 }
 
-// DELETE /api/guru/soal/[id] - Delete soal
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
     const session = await getSession()
 
-    if (!session) {
+    if (!session || session.user.role !== 'guru') {
       return NextResponse.json(
-        { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
-        { status: 401 }
-      )
-    }
-
-    if (session.user.role !== 'guru') {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
-        { status: 403 }
+        { success: false, error: { code: session ? 'FORBIDDEN' : 'UNAUTHORIZED', message: session ? 'Akses ditolak' : 'Tidak terautentikasi' } },
+        { status: session ? 403 : 401 }
       )
     }
 
     const supabase = createAdminClient()
     const { id } = await params
 
-    // Get soal with ujian info
     const { data: soal, error: fetchError } = await supabase
       .from('soal')
       .select(`
@@ -215,22 +185,13 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       .eq('id', id)
       .single()
 
-    if (fetchError || !soal) {
+    if (fetchError || !soal || !soal.ujian || soal.ujian.created_by !== session.user.id) {
       return NextResponse.json(
-        { success: false, error: { code: 'NOT_FOUND', message: 'Soal tidak ditemukan' } },
-        { status: 404 }
+        { success: false, error: { code: fetchError || !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: fetchError || !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
+        { status: fetchError || !soal ? 404 : 403 }
       )
     }
 
-    // Verify user owns this ujian
-    if (soal.ujian.created_by !== session.user.id) {
-      return NextResponse.json(
-        { success: false, error: { code: 'FORBIDDEN', message: 'Anda tidak memiliki akses ke soal ini' } },
-        { status: 403 }
-      )
-    }
-
-    // Check if ujian is active
     if (soal.ujian.status === 'aktif') {
       return NextResponse.json(
         { success: false, error: { code: 'UJIAN_ACTIVE', message: 'Soal tidak dapat dihapus karena ujian sedang aktif' } },
@@ -238,21 +199,18 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       )
     }
 
-    // Delete soal
     const { error } = await supabase
       .from('soal')
       .delete()
       .eq('id', id)
 
     if (error) {
-      console.error('Error deleting soal:', error)
       return NextResponse.json(
         { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
         { status: 500 }
       )
     }
 
-    // Log audit
     await supabase.from('audit_log').insert({
       user_id: session.user.id,
       role: 'guru',
