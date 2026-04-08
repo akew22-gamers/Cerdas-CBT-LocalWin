@@ -1,5 +1,6 @@
-import { createAdminClient } from '@/lib/supabase/admin'
-import Link from 'next/link'
+import { getDb } from '@/lib/db/client';
+import { getSetupStatus } from '@/lib/db';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { 
@@ -21,20 +22,10 @@ import { AnimatedSection, AnimatedCard } from '@/components/landing/AnimatedSect
 
 async function getSetupStatus() {
   try {
-    const supabase = createAdminClient()
-    
-    const { data: identitasSekolah, error } = await supabase
-      .from('identitas_sekolah')
-      .select('id, setup_wizard_completed')
-      .maybeSingle()
-
-    if (error || !identitasSekolah || !identitasSekolah.setup_wizard_completed) {
-      return { isSetupComplete: false }
-    }
-
-    return { isSetupComplete: true }
+    const status = getSetupStatus();
+    return { isSetupComplete: status.hasSuperAdmin && status.hasSchool };
   } catch {
-    return { isSetupComplete: false }
+    return { isSetupComplete: false };
   }
 }
 

@@ -1,124 +1,69 @@
-import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
-import bcrypt from 'bcryptjs'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { createSession, SESSION_COOKIE_NAME, SESSION_CLAIMS_COOKIE_NAME, SESSION_DURATION_SECONDS, signClaims } from '@/lib/auth/session'
+import { NextResponse } from 'next/server';
+import { loginSuperAdmin, loginGuru, loginSiswa } from '@/lib/auth';
+import { getDb } from '@/lib/db/client';
+import { generateId, getTimestamp, toJsonField } from '@/lib/db/utils';
 
 export async function POST(request: Request) {
   try {
-    const supabase = createAdminClient()
-    const body = await request.json()
-    const { username, password, role } = body
+    const body = await request.json();
+    const { username, password, role } = body;
 
     if (!username || !password || !role) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_FIELDS', message: 'Username, password, dan role harus diisi' } },
         { status: 400 }
-      )
+      );
     }
 
-    let user = null
-
+    let result;
+    
     if (role === 'super_admin') {
-      const { data } = await supabase
-        .from('super_admin')
-        .select('*')
-        .eq('username', username)
-        .single()
-      user = data
+      result = await loginSuperAdmin(username, password);
     } else if (role === 'guru') {
-      const { data } = await supabase
-        .from('guru')
-        .select('*')
-        .eq('username', username)
-        .single()
-      user = data
+      result = await loginGuru(username, password);
     } else if (role === 'siswa') {
-      const { data } = await supabase
-        .from('siswa')
-        .select('*')
-        .eq('nisn', username)
-        .single()
-      user = data
+      result = await loginSiswa(username, password);
     } else {
       return NextResponse.json(
         { success: false, error: { code: 'INVALID_ROLE', message: 'Role tidak valid' } },
         { status: 400 }
-      )
+      );
     }
 
-    if (!user) {
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Username atau password salah' } },
+        { success: false, error: { code: 'INVALID_CREDENTIALS', message: result.error } },
         { status: 401 }
-      )
+      );
     }
 
-    const isValidPassword = await bcrypt.compare(password, user.password_hash)
-
-    if (!isValidPassword) {
-      return NextResponse.json(
-        { success: false, error: { code: 'INVALID_CREDENTIALS', message: 'Username atau password salah' } },
-        { status: 401 }
-      )
-    }
-
-    // Create session
-    const session = await createSession(
-      user.id,
+    const db = getDb();
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      result.session!.user.id,
       role,
-      role === 'siswa' ? user.nisn : user.username,
-      user.nama || null
-    )
-
-    // Set session token cookie
-    const cookieStore = await cookies()
-    cookieStore.set(SESSION_COOKIE_NAME, session.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: SESSION_DURATION_SECONDS,
-      path: '/'
-    })
-
-    // Set claims cookie (digunakan middleware untuk skip DB query)
-    const claimsPayload = {
-      role,
-      uid: user.id,
-      username: role === 'siswa' ? user.nisn : user.username,
-      nama: user.nama || null,
-      exp: Math.floor(Date.now() / 1000) + SESSION_DURATION_SECONDS
-    }
-    cookieStore.set(SESSION_CLAIMS_COOKIE_NAME, signClaims(claimsPayload), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: SESSION_DURATION_SECONDS,
-      path: '/'
-    })
-
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: user.id,
-      role: role,
-      action: 'login',
-      entity_type: 'user',
-      entity_id: user.id,
-      details: { login_method: 'password' }
-    })
+      'login',
+      'user',
+      result.session!.user.id,
+      toJsonField({ login_method: 'password' }),
+      getTimestamp()
+    );
 
     return NextResponse.json({
       success: true,
       data: {
-        user: session.user
+        user: result.session!.user
       }
-    })
+    });
 
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('Login error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }

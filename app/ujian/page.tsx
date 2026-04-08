@@ -1,24 +1,23 @@
-import { Card, CardContent } from "@/components/ui/card"
-import { UjianLoginPage } from "@/components/ujian/UjianLoginPage"
-import { createAdminClient } from "@/lib/supabase/admin"
+import { Card, CardContent } from "@/components/ui/card";
+import { UjianLoginPage } from "@/components/ujian/UjianLoginPage";
+import { getDb } from "@/lib/db/client";
 
 async function getSchoolInfo() {
   try {
-    const supabase = createAdminClient()
-
-    const { data: sekolah } = await supabase
-      .from('identitas_sekolah')
-      .select('nama_sekolah, logo_url')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
+    const db = getDb();
+    const sekolah = db.prepare(`
+      SELECT nama_sekolah, logo_url 
+      FROM identitas_sekolah 
+      ORDER BY updated_at DESC 
+      LIMIT 1
+    `).get() as { nama_sekolah: string; logo_url: string | null } | undefined;
 
     return {
       nama_sekolah: sekolah?.nama_sekolah || 'Cerdas-CBT',
-      logo_url: sekolah?.logo_url
-    }
+      logo_url: sekolah?.logo_url || null
+    };
   } catch {
-    return { nama_sekolah: 'Cerdas-CBT', logo_url: null }
+    return { nama_sekolah: 'Cerdas-CBT', logo_url: null };
   }
 }
 

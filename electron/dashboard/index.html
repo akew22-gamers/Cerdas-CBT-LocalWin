@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CBT Server Local - Control Panel</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="logo">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+          <line x1="8" y1="21" x2="16" y2="21"></line>
+          <line x1="12" y1="17" x2="12" y2="21"></line>
+        </svg>
+        <h1>CBT Server Local</h1>
+      </div>
+      <div class="version">v1.0.0</div>
+    </header>
+
+    <section class="status-section">
+      <div class="status-card">
+        <div class="status-indicator" id="statusIndicator">
+          <div class="status-dot"></div>
+          <span class="status-text" id="statusText">Starting...</span>
+        </div>
+        <div class="status-details">
+          <div class="detail-item">
+            <span class="label">Server URL:</span>
+            <span class="value" id="serverUrl">http://localhost:3000</span>
+          </div>
+          <div class="detail-item">
+            <span class="label">Data Folder:</span>
+            <span class="value" id="dataDir">-</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="network-section">
+      <h2>Network Access (LAN)</h2>
+      <div class="network-list" id="networkList">
+        <div class="loading">Detecting network interfaces...</div>
+      </div>
+    </section>
+
+    <section class="actions-section">
+      <div class="action-buttons">
+        <button class="btn btn-primary" id="openBrowserBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="2" y1="12" x2="22" y2="12"></line>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+          </svg>
+          Open in Browser
+        </button>
+        <button class="btn btn-secondary" id="openDataBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          Open Data Folder
+        </button>
+      </div>
+    </section>
+
+    <section class="log-section">
+      <h2>Server Log</h2>
+      <div class="log-container" id="logContainer">
+        <div class="log-entry log-info">Waiting for server to start...</div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>CBT Server Local - Offline Computer Based Test Server</p>
+      <p class="copyright">Accessible via browser from Guru and Siswa computers on the same network.</p>
+    </footer>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
