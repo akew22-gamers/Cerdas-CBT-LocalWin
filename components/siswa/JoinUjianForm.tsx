@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Loader2Icon, X } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 interface JoinUjianFormProps {
   open?: boolean
@@ -37,26 +37,20 @@ export function JoinUjianForm({ open = true, onOpenChange }: JoinUjianFormProps)
       try {
         const response = await fetch("/api/siswa/ujian/join", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            kode_ujian: kodeUjian.trim().toUpperCase(),
-          }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kode_ujian: kodeUjian.trim().toUpperCase() }),
           credentials: 'include'
         })
 
         const result = await response.json()
 
         if (!response.ok) {
-          const errorMessage = result.error?.message || "Gagal bergabung ke ujian"
-          toast.error(errorMessage)
+          toast.error(result.error?.message || "Gagal bergabung ke ujian")
           return
         }
 
         toast.success("Berhasil bergabung ke ujian")
         router.push(result.data.redirect_url)
-        
       } catch (error) {
         console.error("Join ujian error:", error)
         toast.error("Terjadi kesalahan. Silakan coba lagi.")
@@ -69,52 +63,40 @@ export function JoinUjianForm({ open = true, onOpenChange }: JoinUjianFormProps)
       <DialogContent className="sm:max-w-md">
         <button
           onClick={handleClose}
-          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           type="button"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </button>
 
-        <DialogHeader>
-          <DialogTitle className="text-center text-lg">Masuk Ujian</DialogTitle>
-          <DialogDescription className="text-center text-sm">
+        <div className="text-center space-y-2 pt-4">
+          <h2 className="text-xl font-semibold">Masuk Ujian</h2>
+          <p className="text-sm text-muted-foreground">
             Masukkan kode ujian yang diberikan oleh guru
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
         
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pb-4">
           <div className="space-y-2">
-            <label htmlFor="kode_ujian" className="text-sm font-medium text-foreground">
-              Kode Ujian
-            </label>
             <Input
               id="kode_ujian"
               type="text"
-              placeholder="Contoh: ABC123"
+              placeholder="Kode: ABC123"
               value={kodeUjian}
               onChange={(e) => setKodeUjian(e.target.value.toUpperCase())}
               disabled={isPending}
-              className="uppercase tracking-wider text-center text-lg"
+              className="uppercase tracking-wider text-center text-base h-12"
               maxLength={10}
               autoComplete="off"
             />
           </div>
 
-          <DialogFooter>
-            <Button 
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              disabled={isPending}
-              className="w-full"
-            >
-              Batal
-            </Button>
+          <div className="flex flex-col gap-2 pt-2">
             <Button 
               type="submit" 
               disabled={isPending || !kodeUjian.trim()}
-              className="w-full"
+              className="w-full h-11"
             >
               {isPending ? (
                 <>
@@ -125,7 +107,16 @@ export function JoinUjianForm({ open = true, onOpenChange }: JoinUjianFormProps)
                 "Masuk Ujian"
               )}
             </Button>
-          </DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={handleClose}
+              disabled={isPending}
+              className="w-full text-muted-foreground hover:text-foreground"
+            >
+              Batal
+            </Button>
+          </div>
         </form>
       </DialogContent>
     </Dialog>
