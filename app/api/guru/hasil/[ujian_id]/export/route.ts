@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 
@@ -27,13 +27,11 @@ export async function GET(
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
 
-    const { data: ujian } = await supabase
-      .from('ujian')
-      .select('id, judul, kode_ujian, created_by')
-      .eq('id', ujian_id)
-      .single()
+    const ujian = db.prepare(`
+      SELECT id, judul, kode_ujian, created_by FROM ujian WHERE id = ?
+    `).get(ujian_id) as any
 
     if (!ujian || ujian.created_by !== session.user.id) {
       return NextResponse.json(
@@ -42,35 +40,33 @@ export async function GET(
       )
     }
 
-    const { data: hasil } = await supabase
-      .from('hasil_ujian')
-      .select(`
-        id,
-        nilai,
-        jumlah_benar,
-        jumlah_salah,
-        waktu_mulai,
-        waktu_selesai,
-        is_submitted,
-        tab_switch_count,
-        fullscreen_exit_count,
-        siswa:siswa_id (
-          id,
-          nisn,
-          nama,
-          kelas:kelas_id (
-            nama_kelas
-          )
-        )
-      `)
-      .eq('ujian_id', ujian_id)
-      .order('waktu_selesai', { ascending: false })
+    const hasil = db.prepare(`
+      SELECT 
+        h.id,
+        h.nilai,
+        h.jumlah_benar,
+        h.jumlah_salah,
+        h.waktu_mulai,
+        h.waktu_selesai,
+        h.is_submitted,
+        h.tab_switch_count,
+        h.fullscreen_exit_count,
+        s.id as siswa_id,
+        s.nisn as siswa_nisn,
+        s.nama as siswa_nama,
+        k.nama_kelas
+      FROM hasil_ujian h
+      JOIN siswa s ON h.siswa_id = s.id
+      JOIN kelas k ON s.kelas_id = k.id
+      WHERE h.ujian_id = ?
+      ORDER BY h.waktu_selesai DESC
+    `).all(ujian_id) as any[]
 
-    const exportData = (hasil || []).map((h: any, index: number) => ({
+    const exportData = hasil.map((h: any, index: number) => ({
       No: index + 1,
-      NISN: h.siswa?.nisn || '',
-      'Nama Siswa': h.siswa?.nama || '',
-      Kelas: h.siswa?.kelas?.nama_kelas || '-',
+      NISN: h.siswa_nisn || '',
+      'Nama Siswa': h.siswa_nama || '',
+      Kelas: h.nama_kelas || '-',
       Nilai: parseFloat(h.nilai) || 0,
       'Jumlah Benar': h.jumlah_benar || 0,
       'Jumlah Salah': h.jumlah_salah || 0,

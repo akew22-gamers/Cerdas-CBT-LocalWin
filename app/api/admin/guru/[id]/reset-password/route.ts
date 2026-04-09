@@ -1,103 +1,91 @@
-import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import { getSession } from '@/lib/auth/session';
+import { getDb } from '@/lib/db/client';
+import { generateId, getTimestamp, toJsonField } from '@/lib/db/utils';
+import { hashPassword } from '@/lib/auth/password';
+import { NextResponse } from 'next/server';
 
 interface RouteParams {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }
 
-// POST - Reset guru password
 export async function POST(request: Request, { params }: RouteParams) {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
-    const { id } = await params
+    const db = getDb();
+    const { id } = await params;
 
-    const body = await request.json()
-    const { new_password } = body
+    const body = await request.json();
+    const { new_password } = body;
 
-    // Validation
     if (!new_password) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_FIELDS', message: 'Password baru harus diisi' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Validate password length
     if (new_password.length < 6) {
       return NextResponse.json(
         { success: false, error: { code: 'PASSWORD_TOO_SHORT', message: 'Password harus minimal 6 karakter' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Check if guru exists
-    const { data: existingGuru } = await supabase
-      .from('guru')
-      .select('id, username, nama')
-      .eq('id', id)
-      .single()
+    const existingGuru = db.prepare('SELECT id, username, nama FROM guru WHERE id = ?').get(id) as {
+      id: string;
+      username: string;
+      nama: string;
+    } | undefined;
 
     if (!existingGuru) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Guru tidak ditemukan' } },
         { status: 404 }
-      )
+      );
     }
 
-    const password_hash = await bcrypt.hash(new_password, 10)
+    const passwordHash = await hashPassword(new_password);
+    const now = getTimestamp();
 
-    const { error } = await supabase
-      .from('guru')
-      .update({
-        password_hash,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
+    db.prepare('UPDATE guru SET password_hash = ?, updated_at = ? WHERE id = ?').run(passwordHash, now, id);
 
-    if (error) {
-      console.error('Error resetting password:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
-
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'super_admin',
-      action: 'reset_password',
-      entity_type: 'guru',
-      entity_id: id,
-      details: { username: existingGuru.username, nama: existingGuru.nama }
-    })
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      session.user.id,
+      'super_admin',
+      'reset_password',
+      'guru',
+      id,
+      toJsonField({ username: existingGuru.username, nama: existingGuru.nama }),
+      now
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Password berhasil direset'
-    })
+    });
 
   } catch (error) {
-    console.error('Error in POST /api/admin/guru/[id]/reset-password:', error)
+    console.error('Error in POST /api/admin/guru/[id]/reset-password:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }

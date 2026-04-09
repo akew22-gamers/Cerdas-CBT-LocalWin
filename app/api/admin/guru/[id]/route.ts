@@ -1,226 +1,179 @@
-import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import { getSession } from '@/lib/auth/session';
+import { getDb } from '@/lib/db/client';
+import { generateId, getTimestamp, toJsonField } from '@/lib/db/utils';
+import { NextResponse } from 'next/server';
 
 interface RouteParams {
-  params: Promise<{ id: string }>
+  params: Promise<{ id: string }>;
 }
 
-// GET - Get single guru detail
 export async function GET(request: Request, { params }: RouteParams) {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
-    const { id } = await params
+    const db = getDb();
+    const { id } = await params;
 
-    const { data: guru, error } = await supabase
-      .from('guru')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const guru = db.prepare('SELECT id, username, nama, created_by, created_at, updated_at FROM guru WHERE id = ?').get(id);
 
-    if (error || !guru) {
+    if (!guru) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Guru tidak ditemukan' } },
         { status: 404 }
-      )
+      );
     }
 
     return NextResponse.json({
       success: true,
-      data: {
-        guru
-      }
-    })
+      data: { guru }
+    });
 
   } catch (error) {
-    console.error('Error in GET /api/admin/guru/[id]:', error)
+    console.error('Error in GET /api/admin/guru/[id]:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }
 
-// PUT - Update guru data
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
-    const { id } = await params
+    const db = getDb();
+    const { id } = await params;
 
-    const body = await request.json()
-    const { nama, username } = body
+    const body = await request.json();
+    const { nama, username } = body;
 
-    // Validation
     if (!nama) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_FIELDS', message: 'Nama harus diisi' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Check if guru exists
-    const { data: existingGuru } = await supabase
-      .from('guru')
-      .select('id, username')
-      .eq('id', id)
-      .single()
+    const existingGuru = db.prepare('SELECT id, username FROM guru WHERE id = ?').get(id) as { id: string; username: string } | undefined;
 
     if (!existingGuru) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Guru tidak ditemukan' } },
         { status: 404 }
-      )
+      );
     }
 
-    // Check if username is being changed and if it already exists
     if (username && username !== existingGuru.username) {
-      const { data: duplicateGuru } = await supabase
-        .from('guru')
-        .select('id')
-        .eq('username', username)
-        .neq('id', id)
-        .single()
-
+      const duplicateGuru = db.prepare('SELECT id FROM guru WHERE username = ? AND id != ?').get(username, id);
+      
       if (duplicateGuru) {
         return NextResponse.json(
           { success: false, error: { code: 'DUPLICATE_USERNAME', message: 'Username sudah terdaftar' } },
           { status: 400 }
-        )
+        );
       }
 
-      // Validate username format
       if (!/^[a-zA-Z0-9_]+$/.test(username)) {
         return NextResponse.json(
           { success: false, error: { code: 'INVALID_USERNAME', message: 'Username hanya boleh berisi huruf, angka, dan underscore' } },
           { status: 400 }
-        )
+        );
       }
     }
 
-    const updateData: Record<string, string> = {
-      nama,
-      updated_at: new Date().toISOString()
-    }
+    const now = getTimestamp();
+    const newUsername = username || existingGuru.username;
 
-    if (username) {
-      updateData.username = username
-    }
+    db.prepare(`
+      UPDATE guru SET nama = ?, username = ?, updated_at = ? WHERE id = ?
+    `).run(nama, newUsername, now, id);
 
-    const { data: updatedGuru, error } = await supabase
-      .from('guru')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
+    const updatedGuru = db.prepare('SELECT id, username, nama, created_by, created_at, updated_at FROM guru WHERE id = ?').get(id);
 
-    if (error) {
-      console.error('Error updating guru:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
-
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'super_admin',
-      action: 'update',
-      entity_type: 'guru',
-      entity_id: id,
-      details: { username: username || existingGuru.username, nama }
-    })
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      session.user.id,
+      'super_admin',
+      'update',
+      'guru',
+      id,
+      toJsonField({ username: newUsername, nama }),
+      now
+    );
 
     return NextResponse.json({
       success: true,
-      data: {
-        guru: updatedGuru
-      }
-    })
+      data: { guru: updatedGuru }
+    });
 
   } catch (error) {
-    console.error('Error in PUT /api/admin/guru/[id]:', error)
+    console.error('Error in PUT /api/admin/guru/[id]:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
-    const { id } = await params
+    const db = getDb();
+    const { id } = await params;
 
-    // Check if guru exists
-    const { data: existingGuru } = await supabase
-      .from('guru')
-      .select('id, username, nama')
-      .eq('id', id)
-      .single()
+    const existingGuru = db.prepare('SELECT id, username, nama FROM guru WHERE id = ?').get(id) as { id: string; username: string; nama: string } | undefined;
 
     if (!existingGuru) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Guru tidak ditemukan' } },
         { status: 404 }
-      )
+      );
     }
 
-    // Check if guru has related data (kelas, ujian)
-    const { count: kelasCount } = await supabase
-      .from('kelas')
-      .select('*', { count: 'exact', head: true })
-      .eq('created_by', id)
+    const kelasCount = db.prepare('SELECT COUNT(*) as count FROM kelas WHERE created_by = ?').get(id) as { count: number };
+    const ujianCount = db.prepare('SELECT COUNT(*) as count FROM ujian WHERE created_by = ?').get(id) as { count: number };
 
-    const { count: ujianCount } = await supabase
-      .from('ujian')
-      .select('*', { count: 'exact', head: true })
-      .eq('created_by', id)
-
-    const totalRelated = (kelasCount || 0) + (ujianCount || 0)
+    const totalRelated = kelasCount.count + ujianCount.count;
 
     if (totalRelated > 0) {
       return NextResponse.json(
@@ -228,46 +181,40 @@ export async function DELETE(request: Request, { params }: RouteParams) {
           success: false, 
           error: { 
             code: 'HAS_RELATED_DATA', 
-            message: `Guru tidak dapat dihapus karena masih memiliki ${kelasCount || 0} kelas dan ${ujianCount || 0} ujian` 
+            message: `Guru tidak dapat dihapus karena masih memiliki ${kelasCount.count} kelas dan ${ujianCount.count} ujian` 
           } 
         },
         { status: 400 }
-      )
+      );
     }
 
-    const { error } = await supabase
-      .from('guru')
-      .delete()
-      .eq('id', id)
+    db.prepare('DELETE FROM guru WHERE id = ?').run(id);
 
-    if (error) {
-      console.error('Error deleting guru:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
-
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'super_admin',
-      action: 'delete',
-      entity_type: 'guru',
-      entity_id: id,
-      details: { username: existingGuru.username, nama: existingGuru.nama }
-    })
+    const now = getTimestamp();
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      session.user.id,
+      'super_admin',
+      'delete',
+      'guru',
+      id,
+      toJsonField({ username: existingGuru.username, nama: existingGuru.nama }),
+      now
+    );
 
     return NextResponse.json({
       success: true,
       message: 'Guru berhasil dihapus'
-    })
+    });
 
   } catch (error) {
-    console.error('Error in DELETE /api/admin/guru/[id]:', error)
+    console.error('Error in DELETE /api/admin/guru/[id]:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }

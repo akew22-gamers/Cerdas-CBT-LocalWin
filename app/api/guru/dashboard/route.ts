@@ -1,8 +1,7 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 
-// GET /api/guru/dashboard - Dashboard stats for guru
 export async function GET() {
   try {
     const session = await getSession()
@@ -21,64 +20,43 @@ export async function GET() {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
 
-    // Get total kelas count
-    const { data: kelasData, error: kelasError } = await supabase
-      .from('kelas')
-      .select('id')
-      .eq('created_by', session.user.id)
+    const kelasCount = db.prepare(`
+      SELECT COUNT(*) as count FROM kelas WHERE created_by = ?
+    `).get(session.user.id) as any
 
-    if (kelasError) throw kelasError
+    const siswaCount = db.prepare(`
+      SELECT COUNT(*) as count FROM siswa WHERE created_by = ?
+    `).get(session.user.id) as any
 
-    // Get total siswa count
-    const { data: siswaData, error: siswaError } = await supabase
-      .from('siswa')
-      .select('id')
-      .eq('created_by', session.user.id)
+    const ujianData = db.prepare(`
+      SELECT id, status FROM ujian WHERE created_by = ?
+    `).all(session.user.id) as any[]
 
-    if (siswaError) throw siswaError
-
-    // Get total ujian count
-    const { data: ujianData, error: ujianError } = await supabase
-      .from('ujian')
-      .select('id, status')
-      .eq('created_by', session.user.id)
-
-    if (ujianError) throw ujianError
-
-    // Count active ujian
     const ujianAktif = ujianData.filter((u: any) => u.status === 'aktif').length
 
-    // Get recent hasil (last 5 submitted)
-    const { data: recentHasil, error: hasilError } = await supabase
-      .from('hasil_ujian')
-      .select(`
-        id,
-        nilai,
-        waktu_selesai,
-        siswa:siswa_id (
-          nama,
-          nisn
-        ),
-        ujian:ujian_id (
-          judul
-        )
-      `)
-      .eq('is_submitted', true)
-      .order('waktu_selesai', { ascending: false })
-      .limit(5)
+    const recentHasil = db.prepare(`
+      SELECT 
+        h.id,
+        h.nilai,
+        h.waktu_selesai,
+        s.nama as siswa_nama,
+        s.nisn as siswa_nisn,
+        u.judul as ujian_judul
+      FROM hasil_ujian h
+      JOIN siswa s ON h.siswa_id = s.id
+      JOIN ujian u ON h.ujian_id = u.id
+      WHERE h.is_submitted = 1
+      ORDER BY h.waktu_selesai DESC
+      LIMIT 5
+    `).all() as any[]
 
-    if (hasilError) {
-      console.error('Error fetching recent hasil:', hasilError)
-    }
-
-    // Format recent hasil
-    const formattedRecentHasil = (recentHasil || []).map((h: any) => ({
+    const formattedRecentHasil = recentHasil.map((h: any) => ({
       id: h.id,
-      siswa_nama: h.siswa?.nama || '-',
-      siswa_nisn: h.siswa?.nisn || '-',
-      ujian_judul: h.ujian?.judul || '-',
+      siswa_nama: h.siswa_nama || '-',
+      siswa_nisn: h.siswa_nisn || '-',
+      ujian_judul: h.ujian_judul || '-',
       nilai: h.nilai,
       submitted_at: h.waktu_selesai
     }))
@@ -86,8 +64,8 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        kelas_count: kelasData.length,
-        siswa_count: siswaData.length,
+        kelas_count: kelasCount?.count || 0,
+        siswa_count: siswaCount?.count || 0,
         ujian_count: ujianData.length,
         ujian_aktif: ujianAktif,
         recent_hasil: formattedRecentHasil

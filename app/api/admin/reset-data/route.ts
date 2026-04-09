@@ -1,34 +1,35 @@
-import { NextResponse } from 'next/server'
-import type { ApiSuccessResponse, ApiErrorResponse } from '@/types/api'
-import { getSession } from '@/lib/auth/session'
-import { logAudit } from '@/lib/utils/audit'
+import { NextResponse } from 'next/server';
+import { getSession } from '@/lib/auth/session';
+import { getDb } from '@/lib/db/client';
+import { generateId, getTimestamp, toJsonField } from '@/lib/db/utils';
 
 export async function POST() {
   try {
-    const session = await getSession()
+    const session = await getSession();
 
     if (!session) {
-      return NextResponse.json<ApiErrorResponse>({
+      return NextResponse.json({
         success: false,
         error: {
           code: 'UNAUTHORIZED',
           message: 'Tidak terautentikasi'
         }
-      }, { status: 401 })
+      }, { status: 401 });
     }
 
     if (session.user.role !== 'super_admin') {
-      return NextResponse.json<ApiErrorResponse>({
+      return NextResponse.json({
         success: false,
         error: {
           code: 'FORBIDDEN',
           message: 'Hanya super admin yang dapat mereset data'
         }
-      }, { status: 403 })
+      }, { status: 403 });
     }
 
-    const { createAdminClient } = await import('@/lib/supabase/admin')
-    const supabase = createAdminClient()
+    const db = getDb();
+
+    const deletedCounts: Record<string, number> = {};
 
     const tablesToDelete = [
       'jawaban_siswa',
@@ -39,51 +40,44 @@ export async function POST() {
       'ujian',
       'siswa',
       'kelas',
-    ]
-
-    const deletedCounts: Record<string, number> = {}
+    ];
 
     for (const table of tablesToDelete) {
-      const { count, error } = await supabase
-        .from(table)
-        .delete({ count: 'exact' })
-        .neq('id', '00000000-0000-0000-0000-000000000000')
-
-      if (error) {
-        console.error(`Error deleting ${table}:`, error)
-      }
-
-      deletedCounts[table] = count || 0
+      const countBefore = db.prepare(`SELECT COUNT(*) as count FROM ${table}`).get() as { count: number };
+      db.prepare(`DELETE FROM ${table}`).run();
+      deletedCounts[table] = countBefore.count;
     }
 
-    await logAudit({
-      userId: session.user.id,
-      role: 'super_admin',
-      action: 'reset_data',
-      entityType: 'system',
-      details: {
-        deleted_counts: deletedCounts
-      }
-    })
+    const now = getTimestamp();
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      session.user.id,
+      'super_admin',
+      'reset_data',
+      'system',
+      'all',
+      toJsonField({ deleted_counts: deletedCounts }),
+      now
+    );
 
-    return NextResponse.json<ApiSuccessResponse<{
-      message: string
-      deleted_counts: Record<string, number>
-    }>>({
+    return NextResponse.json({
       success: true,
       data: {
         message: 'Data berhasil di-reset',
         deleted_counts: deletedCounts
       }
-    })
+    });
   } catch (error) {
-    console.error('Reset data error:', error)
-    return NextResponse.json<ApiErrorResponse>({
+    console.error('Reset data error:', error);
+    return NextResponse.json({
       success: false,
       error: {
         code: 'DATABASE_ERROR',
         message: 'Gagal mereset data'
       }
-    }, { status: 500 })
+    }, { status: 500 });
   }
 }

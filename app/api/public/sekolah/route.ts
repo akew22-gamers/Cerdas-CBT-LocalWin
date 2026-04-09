@@ -1,25 +1,25 @@
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { getDb } from '@/lib/db/client';
+import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    
-    const { data: sekolah, error } = await supabase
-      .from('identitas_sekolah')
-      .select('nama_sekolah, logo_url')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
+    const db = getDb();
 
-    if (error || !sekolah) {
+    const sekolah = db.prepare(`
+      SELECT nama_sekolah, logo_url
+      FROM identitas_sekolah
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).get() as { nama_sekolah: string; logo_url: string | null } | undefined;
+
+    if (!sekolah) {
       return NextResponse.json({
         success: true,
         data: {
           nama_sekolah: 'Sekolah Default',
           logo_url: null
         }
-      })
+      });
     }
 
     return NextResponse.json({
@@ -28,16 +28,16 @@ export async function GET() {
         nama_sekolah: sekolah.nama_sekolah || 'Sekolah Default',
         logo_url: sekolah.logo_url
       }
-    })
+    });
 
   } catch (error) {
-    console.error('Get school identity error:', error)
+    console.error('Get school identity error:', error);
     return NextResponse.json({
       success: true,
       data: {
         nama_sekolah: 'Sekolah Default',
         logo_url: null
       }
-    })
+    });
   }
 }

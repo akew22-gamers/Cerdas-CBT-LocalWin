@@ -1,8 +1,7 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 
-// GET /api/guru/ujian/[id]/kelas - List assigned kelas
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -24,17 +23,12 @@ export async function GET(
       )
     }
 
-    const supabase = createAdminClient()
-
+    const db = getDb()
     const { id } = await params
 
-// Check if ujian exists and belongs to user
-    const { data: ujian } = await supabase
-      .from('ujian')
-      .select('id')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const ujian = db.prepare(`
+      SELECT id FROM ujian WHERE id = ? AND created_by = ?
+    `).get(id, session.user.id) as any
 
     if (!ujian) {
       return NextResponse.json(
@@ -43,29 +37,18 @@ export async function GET(
       )
     }
 
-    // Get assigned kelas
-    const { data: assignedKelas, error } = await supabase
-      .from('ujian_kelas')
-      .select(`
-        id,
-        kelas_id,
-        kelas:kelas(id, nama_kelas, created_at)
-      `)
-      .eq('ujian_id', id)
-      .order('kelas(nama_kelas)', { ascending: true })
-
-    if (error) {
-      console.error('Error fetching assigned kelas:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal mengambil data kelas' } },
-        { status: 500 }
-      )
-    }
+    const assignedKelas = db.prepare(`
+      SELECT uk.id, uk.kelas_id, k.id as kelas_id2, k.nama_kelas, k.created_at
+      FROM ujian_kelas uk
+      JOIN kelas k ON uk.kelas_id = k.id
+      WHERE uk.ujian_id = ?
+      ORDER BY k.nama_kelas ASC
+    `).all(id) as any[]
 
     const kelasList = assignedKelas.map((uk: any) => ({
-      id: uk.kelas.id,
-      nama_kelas: uk.kelas.nama_kelas,
-      created_at: uk.kelas.created_at
+      id: uk.kelas_id,
+      nama_kelas: uk.nama_kelas,
+      created_at: uk.created_at
     }))
 
     return NextResponse.json({
@@ -84,7 +67,6 @@ export async function GET(
   }
 }
 
-// POST /api/guru/ujian/[id]/kelas - Assign kelas to ujian
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -106,8 +88,7 @@ export async function POST(
       )
     }
 
-    const supabase = createAdminClient()
-
+    const db = getDb()
     const { id } = await params
     const body = await request.json()
 
@@ -118,13 +99,9 @@ export async function POST(
       )
     }
 
-    // Check if ujian exists and belongs to user
-    const { data: ujian } = await supabase
-      .from('ujian')
-      .select('id')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const ujian = db.prepare(`
+      SELECT id FROM ujian WHERE id = ? AND created_by = ?
+    `).get(id, session.user.id) as any
 
     if (!ujian) {
       return NextResponse.json(
@@ -133,15 +110,11 @@ export async function POST(
       )
     }
 
-    // Get currently assigned kelas to avoid duplicates
-    const { data: existingAssignments } = await supabase
-      .from('ujian_kelas')
-      .select('kelas_id')
-      .eq('ujian_id', id)
+    const existingAssignments = db.prepare(`
+      SELECT kelas_id FROM ujian_kelas WHERE ujian_id = ?
+    `).all(id) as any[]
 
-    const existingKelasIds = existingAssignments?.map((a: any) => a.kelas_id) || []
-
-    // Filter out already assigned kelas
+    const existingKelasIds = existingAssignments.map((a: any) => a.kelas_id)
     const newKelasIds = body.kelas_ids.filter((k: string) => !existingKelasIds.includes(k))
 
     if (newKelasIds.length === 0) {
@@ -151,23 +124,22 @@ export async function POST(
       })
     }
 
-    // Insert new assignments
-    const assignments = newKelasIds.map((kelasId: string) => ({
-      ujian_id: id,
-      kelas_id: kelasId
-    }))
+    const insertUjianKelas = db.prepare(`
+      INSERT INTO ujian_kelas (id, ujian_id, kelas_id, created_at)
+      VALUES (?, ?, ?, ?)
+    `)
 
-    const { error: insertError } = await supabase
-      .from('ujian_kelas')
-      .insert(assignments)
+    const { v4: uuidv4 } = await import('uuid')
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
 
-    if (insertError) {
-      console.error('Error assigning kelas:', insertError)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal menugaskan kelas' } },
-        { status: 500 }
-      )
-    }
+    const transaction = db.transaction((ids: string[]) => {
+      for (const kelasId of ids) {
+        const ukId = uuidv4()
+        insertUjianKelas.run(ukId, id, kelasId, now)
+      }
+    })
+
+    transaction(newKelasIds)
 
     return NextResponse.json({
       success: true,
@@ -183,7 +155,6 @@ export async function POST(
   }
 }
 
-// DELETE /api/guru/ujian/[id]/kelas - Remove kelas from ujian
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -205,8 +176,7 @@ export async function DELETE(
       )
     }
 
-    const supabase = createAdminClient()
-
+    const db = getDb()
     const { id } = await params
     const body = await request.json()
 
@@ -217,13 +187,9 @@ export async function DELETE(
       )
     }
 
-    // Check if ujian exists and belongs to user
-    const { data: ujian } = await supabase
-      .from('ujian')
-      .select('id')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const ujian = db.prepare(`
+      SELECT id FROM ujian WHERE id = ? AND created_by = ?
+    `).get(id, session.user.id) as any
 
     if (!ujian) {
       return NextResponse.json(
@@ -232,20 +198,9 @@ export async function DELETE(
       )
     }
 
-    // Delete assignment
-    const { error: deleteError } = await supabase
-      .from('ujian_kelas')
-      .delete()
-      .eq('ujian_id', id)
-      .eq('kelas_id', body.kelas_id)
-
-    if (deleteError) {
-      console.error('Error removing kelas:', deleteError)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal menghapus kelas' } },
-        { status: 500 }
-      )
-    }
+    db.prepare(`
+      DELETE FROM ujian_kelas WHERE ujian_id = ? AND kelas_id = ?
+    `).run(id, body.kelas_id)
 
     return NextResponse.json({
       success: true,

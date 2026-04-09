@@ -1,190 +1,183 @@
-import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import { getSession } from '@/lib/auth/session';
+import { getDb } from '@/lib/db/client';
+import { generateId, getTimestamp, toJsonField } from '@/lib/db/utils';
+import { hashPassword } from '@/lib/auth/password';
+import { NextResponse } from 'next/server';
 
-// GET - List all guru with pagination
 export async function GET(request: Request) {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
+    const db = getDb();
 
-    // Parse query params
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    const search = searchParams.get('search') || ''
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '10');
+    const search = searchParams.get('search') || '';
 
-    // Calculate offset
-    const offset = (page - 1) * limit
+    const offset = (page - 1) * limit;
 
-    // Build query
-    let query = supabase
-      .from('guru')
-      .select('*', { count: 'exact' })
+    let guruList;
+    let total;
 
-    // Apply search filter
     if (search) {
-      query = query.or(`username.ilike.%${search}%,nama.ilike.%${search}%`)
+      const searchTerm = `%${search.toLowerCase()}%`;
+      guruList = db.prepare(`
+        SELECT * FROM guru
+        WHERE LOWER(username) LIKE ? OR LOWER(nama) LIKE ?
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+      `).all(searchTerm, searchTerm, limit, offset) as Array<{
+        id: string;
+        username: string;
+        nama: string;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      const countResult = db.prepare(`
+        SELECT COUNT(*) as count FROM guru
+        WHERE LOWER(username) LIKE ? OR LOWER(nama) LIKE ?
+      `).get(searchTerm, searchTerm) as { count: number };
+      total = countResult.count;
+    } else {
+      guruList = db.prepare(`
+        SELECT * FROM guru
+        ORDER BY created_at DESC
+        LIMIT ? OFFSET ?
+      `).all(limit, offset) as Array<{
+        id: string;
+        username: string;
+        nama: string;
+        created_by: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+
+      const countResult = db.prepare('SELECT COUNT(*) as count FROM guru').get() as { count: number };
+      total = countResult.count;
     }
-
-    const { data: guruList, error } = await query
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    if (error) {
-      console.error('Error fetching guru:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
-
-    // Get total count
-    const { count } = await supabase
-      .from('guru')
-      .select('*', { count: 'exact', head: true })
 
     return NextResponse.json({
       success: true,
       data: {
-        guru: guruList || [],
+        guru: guruList,
         pagination: {
           page,
           limit,
-          total: count || 0,
-          totalPages: Math.ceil((count || 0) / limit)
+          total,
+          totalPages: Math.ceil(total / limit)
         }
       }
-    })
+    });
 
   } catch (error) {
-    console.error('Error in GET /api/admin/guru:', error)
+    console.error('Error in GET /api/admin/guru:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }
 
-// POST - Create new guru
 export async function POST(request: Request) {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
+    const db = getDb();
 
-    const body = await request.json()
-    const { username, nama, password } = body
+    const body = await request.json();
+    const { username, nama, password } = body;
 
-    // Validation
     if (!username || !nama || !password) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_FIELDS', message: 'Username, nama, dan password harus diisi' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Validate username format
     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
       return NextResponse.json(
         { success: false, error: { code: 'INVALID_USERNAME', message: 'Username hanya boleh berisi huruf, angka, dan underscore' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Validate password length
     if (password.length < 6) {
       return NextResponse.json(
         { success: false, error: { code: 'PASSWORD_TOO_SHORT', message: 'Password harus minimal 6 karakter' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Check if username already exists
-    const { data: existingGuru } = await supabase
-      .from('guru')
-      .select('id')
-      .eq('username', username)
-      .single()
-
+    const existingGuru = db.prepare('SELECT id FROM guru WHERE username = ?').get(username);
     if (existingGuru) {
       return NextResponse.json(
         { success: false, error: { code: 'DUPLICATE_USERNAME', message: 'Username sudah terdaftar' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Hash password
-    const password_hash = await bcrypt.hash(password, 10)
+    const passwordHash = await hashPassword(password);
+    const id = generateId();
+    const now = getTimestamp();
 
-    // Insert guru
-    const { data: newGuru, error } = await supabase
-      .from('guru')
-      .insert({
-        username,
-        nama,
-        password_hash,
-        created_by: session.user.id
-      })
-      .select()
-      .single()
+    db.prepare(`
+      INSERT INTO guru (id, username, nama, password_hash, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, username, nama, passwordHash, session.user.id, now, now);
 
-    if (error) {
-      console.error('Error creating guru:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
+    const newGuru = db.prepare('SELECT id, username, nama, created_by, created_at FROM guru WHERE id = ?').get(id);
 
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'super_admin',
-      action: 'create',
-      entity_type: 'guru',
-      entity_id: newGuru.id,
-      details: { username, nama }
-    })
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      session.user.id,
+      'super_admin',
+      'create',
+      'guru',
+      id,
+      toJsonField({ username, nama }),
+      now
+    );
 
     return NextResponse.json({
       success: true,
-      data: {
-        guru: newGuru
-      }
-    })
+      data: { guru: newGuru }
+    });
 
   } catch (error) {
-    console.error('Error in POST /api/admin/guru:', error)
+    console.error('Error in POST /api/admin/guru:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }

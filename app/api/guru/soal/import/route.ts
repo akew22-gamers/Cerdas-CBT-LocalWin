@@ -1,9 +1,9 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
+import { generateId, getTimestamp } from '@/lib/db/utils'
 import { NextResponse } from 'next/server'
 import { read, utils } from 'xlsx'
 
-// POST /api/guru/soal/import - Import soal from Excel
 export async function POST(request: Request) {
   try {
     const session = await getSession()
@@ -22,9 +22,9 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
 
-    // Parse form data
     const formData = await request.formData()
     const file = formData.get('file') as File | null
     const ujian_id = formData.get('ujian_id') as string
@@ -36,13 +36,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify user owns this ujian
-    const { data: ujian } = await supabase
-      .from('ujian')
-      .select('id, status')
-      .eq('id', ujian_id)
-      .eq('created_by', session.user.id)
-      .single()
+    const ujian = db.prepare('SELECT id, status FROM ujian WHERE id = ? AND created_by = ?').get(ujian_id, guruId) as { id: string; status: string } | undefined
 
     if (!ujian) {
       return NextResponse.json(
@@ -51,7 +45,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Check if ujian is active
     if (ujian.status === 'aktif') {
       return NextResponse.json(
         { success: false, error: { code: 'UJIAN_ACTIVE', message: 'Tidak dapat mengimpor soal karena ujian sedang aktif' } },
@@ -59,7 +52,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Parse Excel file
     const arrayBuffer = await file.arrayBuffer()
     const workbook = read(arrayBuffer)
     const worksheet = workbook.Sheets[workbook.SheetNames[0]]
@@ -72,26 +64,21 @@ export async function POST(request: Request) {
       )
     }
 
-    // Validate and process rows
     const errors: Array<{ row: number; message: string }> = []
     const soalToInsert: any[] = []
-    let currentUrutan = 0
 
-    // Get current max urutan
-    const { data: maxUrutanData } = await supabase
-      .from('soal')
-      .select('urutan')
-      .eq('ujian_id', ujian_id)
-      .order('urutan', { ascending: false })
-      .limit(1)
-      .single()
-    
-    currentUrutan = maxUrutanData ? maxUrutanData.urutan + 1 : 0
+    const maxUrutanData = db.prepare(`
+      SELECT urutan FROM soal
+      WHERE ujian_id = ?
+      ORDER BY urutan DESC
+      LIMIT 1
+    `).get(ujian_id) as { urutan: number } | undefined
+
+    let currentUrutan = maxUrutanData ? maxUrutanData.urutan + 1 : 0
 
     data.forEach((row: any, index: number) => {
-      const rowNum = index + 1 // 1-based row number
+      const rowNum = index + 1
 
-      // Check required fields
       if (!row['Soal'] || !row['Jawaban Benar'] || !row['Pengecoh 1'] || !row['Pengecoh 2']) {
         errors.push({
           row: rowNum,
@@ -101,6 +88,7 @@ export async function POST(request: Request) {
       }
 
       soalToInsert.push({
+        id: generateId(),
         ujian_id,
         teks_soal: row['Soal'],
         gambar_url: row['Gambar_URL'] || null,
@@ -120,38 +108,48 @@ export async function POST(request: Request) {
       )
     }
 
-    // Batch insert soal (max 100 per batch)
-    const batchSize = 100
-    const batches = []
-    for (let i = 0; i < soalToInsert.length; i += batchSize) {
-      const batch = soalToInsert.slice(i, i + batchSize)
-      batches.push(batch)
-    }
+    const now = getTimestamp()
 
-    let insertedCount = 0
-    for (const batch of batches) {
-      const { error } = await supabase
-        .from('soal')
-        .insert(batch)
+    const transaction = db.transaction(() => {
+      const insertStmt = db.prepare(`
+        INSERT INTO soal (id, ujian_id, teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
 
-      if (error) {
-        console.error('Batch insert error:', error)
-        return NextResponse.json(
-          { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-          { status: 500 }
+      for (const soal of soalToInsert) {
+        insertStmt.run(
+          soal.id,
+          soal.ujian_id,
+          soal.teks_soal,
+          soal.gambar_url,
+          soal.jawaban_benar,
+          soal.pengecoh_1,
+          soal.pengecoh_2,
+          soal.pengecoh_3,
+          soal.pengecoh_4,
+          soal.urutan,
+          now,
+          now
         )
       }
-      insertedCount += batch.length
-    }
-
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'guru',
-      action: 'create',
-      entity_type: 'soal',
-      details: { ujian_id, imported_count: insertedCount, source: 'excel_import' }
     })
+
+    transaction()
+
+    const insertedCount = soalToInsert.length
+
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      guruId,
+      'guru',
+      'create',
+      'soal',
+      JSON.stringify({ ujian_id, imported_count: insertedCount, source: 'excel_import' }),
+      now
+    )
 
     return NextResponse.json({
       success: true,

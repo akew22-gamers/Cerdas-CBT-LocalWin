@@ -1,13 +1,13 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
+import { generateId, getTimestamp } from '@/lib/db/utils'
+import { hashPassword } from '@/lib/auth/password'
 import { NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
 
 interface RouteParams {
   params: Promise<{ id: string }>
 }
 
-// POST - Reset siswa password
 export async function POST(request: Request, { params }: RouteParams) {
   try {
     const session = await getSession()
@@ -25,13 +25,13 @@ export async function POST(request: Request, { params }: RouteParams) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
     const { id } = await params
 
     const body = await request.json()
     const { new_password } = body
 
-    // Validation
     if (!new_password) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_FIELDS', message: 'Password baru harus diisi' } },
@@ -39,13 +39,7 @@ export async function POST(request: Request, { params }: RouteParams) {
       )
     }
 
-    // Check if siswa exists and belongs to this guru
-    const { data: existingSiswa } = await supabase
-      .from('siswa')
-      .select('id, nisn, nama')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const existingSiswa = db.prepare('SELECT id, nisn, nama FROM siswa WHERE id = ? AND created_by = ?').get(id, guruId) as { id: string; nisn: string; nama: string } | undefined
 
     if (!existingSiswa) {
       return NextResponse.json(
@@ -54,33 +48,19 @@ export async function POST(request: Request, { params }: RouteParams) {
       )
     }
 
-    const password_hash = await bcrypt.hash(new_password, 10)
+    const password_hash = await hashPassword(new_password)
+    const now = getTimestamp()
 
-    const { error } = await supabase
-      .from('siswa')
-      .update({
-        password_hash,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', id)
+    db.prepare(`
+      UPDATE siswa
+      SET password_hash = ?, updated_at = ?
+      WHERE id = ?
+    `).run(password_hash, now, id)
 
-    if (error) {
-      console.error('Error resetting password:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
-
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'guru',
-      action: 'reset_password',
-      entity_type: 'siswa',
-      entity_id: id,
-      details: { nisn: existingSiswa.nisn, nama: existingSiswa.nama }
-    })
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), guruId, 'reset_password', 'siswa', id, JSON.stringify({ nisn: existingSiswa.nisn, nama: existingSiswa.nama }), now)
 
     return NextResponse.json({
       success: true,

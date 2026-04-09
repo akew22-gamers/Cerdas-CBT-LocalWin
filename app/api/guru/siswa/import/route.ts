@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import bcrypt from 'bcryptjs'
+import { getDb } from '@/lib/db/client'
+import { generateId, getTimestamp } from '@/lib/db/utils'
+import { hashPassword } from '@/lib/auth/password'
 import * as XLSX from 'xlsx'
 
 interface ImportRow {
@@ -64,110 +65,87 @@ export async function POST(request: Request) {
       }, { status: 403 })
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
     const guruId = session.user.id
 
-    const { data: kelasList } = await supabase
-      .from('kelas')
-      .select('id, nama_kelas')
-
-    const kelasMap = new Map(kelasList?.map((k: any) => [k.nama_kelas.toLowerCase(), k.id]) || [])
+    const kelasRows = db.prepare('SELECT id, nama_kelas FROM kelas').all() as { id: string; nama_kelas: string }[]
+    const kelasMap = new Map(kelasRows.map((k) => [k.nama_kelas.toLowerCase(), k.id]))
 
     const errors: ImportError[] = []
     let imported = 0
     let updated = 0
     let skipped = 0
 
-    for (let i = 0; i < jsonData.length; i++) {
-      const row = jsonData[i]
-      const rowNumber = i +2
+    const now = getTimestamp()
 
-      const nisn = String(row.NISN || '').trim()
-      const nama = String(row.Nama || '').trim()
-      const password = String(row.Password || '').trim()
-      const kelasName = String(row.Kelas || '').trim()
+    const transaction = db.transaction(() => {
+      for (let i = 0; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        const rowNumber = i + 2
 
-      if (!nisn || !nama || !password) {
-        errors.push({ row: rowNumber, message: 'NISN, Nama, dan Password wajib diisi' })
-        skipped++
-        continue
-      }
+        const nisn = String(row.NISN || '').trim()
+        const nama = String(row.Nama || '').trim()
+        const password = String(row.Password || '').trim()
+        const kelasName = String(row.Kelas || '').trim()
 
-      if (!/^\d+$/.test(nisn)) {
-        errors.push({ row: rowNumber, message: 'NISN harus berupa angka' })
-        skipped++
-        continue
-      }
+        if (!nisn || !nama || !password) {
+          errors.push({ row: rowNumber, message: 'NISN, Nama, dan Password wajib diisi' })
+          skipped++
+          continue
+        }
 
-      const kelasId = kelasMap.get(kelasName.toLowerCase())
-      if (kelasName && !kelasId) {
-        errors.push({ row: rowNumber, message: `Kelas '${kelasName}' tidak ditemukan` })
-        skipped++
-        continue
-      }
+        if (!/^\d+$/.test(nisn)) {
+          errors.push({ row: rowNumber, message: 'NISN harus berupa angka' })
+          skipped++
+          continue
+        }
 
-      const { data: existingSiswa } = await supabase
-        .from('siswa')
-        .select('id')
-        .eq('nisn', nisn)
-        .single()
+        const kelasId = kelasName ? kelasMap.get(kelasName.toLowerCase()) : undefined
+        if (kelasName && !kelasId) {
+          errors.push({ row: rowNumber, message: `Kelas '${kelasName}' tidak ditemukan` })
+          skipped++
+          continue
+        }
 
-      const passwordHash = await bcrypt.hash(password, 10)
+        const existingSiswa = db.prepare('SELECT id FROM siswa WHERE nisn = ?').get(nisn) as { id: string } | undefined
+        const passwordHash = hashPasswordSync(password)
 
-      if (existingSiswa) {
-        if (mode === 'update_existing') {
-          const { error } = await supabase
-            .from('siswa')
-            .update({
-              nama,
-              password_hash: passwordHash,
-              kelas_id: kelasId || null,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingSiswa.id)
-
-          if (error) {
-            errors.push({ row: rowNumber, message: `Gagal update: ${error.message}` })
-            skipped++
-          } else {
+        if (existingSiswa) {
+          if (mode === 'update_existing') {
+            db.prepare(`
+              UPDATE siswa
+              SET nama = ?, password_hash = ?, kelas_id = ?, updated_at = ?
+              WHERE id = ?
+            `).run(nama, passwordHash, kelasId || null, now, existingSiswa.id)
             updated++
+          } else {
+            skipped++
           }
         } else {
-          skipped++
-        }
-      } else {
-        const { error } = await supabase
-          .from('siswa')
-          .insert({
-            nisn,
-            nama,
-            password_hash: passwordHash,
-            kelas_id: kelasId || null,
-            created_by: guruId
-          })
-
-        if (error) {
-          errors.push({ row: rowNumber, message: `Gagal import: ${error.message}` })
-          skipped++
-        } else {
+          const id = generateId()
+          db.prepare(`
+            INSERT INTO siswa (id, nisn, nama, password_hash, kelas_id, created_by, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(id, nisn, nama, passwordHash, kelasId || null, guruId, now, now)
           imported++
         }
       }
-    }
-
-    await supabase.from('audit_log').insert({
-      user_id: guruId,
-      role: 'guru',
-      action: 'import_siswa',
-      entity_type: 'siswa',
-      details: {
-        total_rows: jsonData.length,
-        imported,
-        updated,
-        skipped,
-        error_count: errors.length
-      }
     })
+
+    transaction()
+
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      generateId(),
+      guruId,
+      'guru',
+      'import_siswa',
+      'siswa',
+      JSON.stringify({ total_rows: jsonData.length, imported, updated, skipped, error_count: errors.length }),
+      now
+    )
 
     return NextResponse.json({
       success: true,
@@ -186,4 +164,9 @@ export async function POST(request: Request) {
       error: { code: 'IMPORT_ERROR', message: 'Terjadi kesalahan saat import' }
     }, { status: 500 })
   }
+}
+
+function hashPasswordSync(password: string): string {
+  const bcrypt = require('bcryptjs')
+  return bcrypt.hashSync(password, 10)
 }

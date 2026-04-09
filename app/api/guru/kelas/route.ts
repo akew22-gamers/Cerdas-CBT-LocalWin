@@ -1,8 +1,8 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
+import { generateId, getTimestamp } from '@/lib/db/utils'
 import { NextResponse } from 'next/server'
 
-// GET /api/guru/kelas - List all kelas owned by current guru
 export async function GET() {
   try {
     const session = await getSession()
@@ -21,34 +21,22 @@ export async function GET() {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
 
-    // Get all kelas created by this guru with jumlah siswa count
-    const { data: kelasList, error } = await supabase
-      .from('kelas')
-      .select(`
-        id,
-        nama_kelas,
-        created_at,
-        siswa_count:siswa(count)
-      `)
-      .eq('created_by', session.user.id)
-      .order('nama_kelas', { ascending: true })
+    const kelasRows = db.prepare(`
+      SELECT k.id, k.nama_kelas, k.created_at,
+        (SELECT COUNT(*) FROM siswa s WHERE s.kelas_id = k.id) as jumlah_siswa
+      FROM kelas k
+      WHERE k.created_by = ?
+      ORDER BY k.nama_kelas ASC
+    `).all(guruId) as any[]
 
-    if (error) {
-      console.error('Error fetching kelas:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal mengambil data kelas' } },
-        { status: 500 }
-      )
-    }
-
-    // Transform data to include jumlah_siswa
-    const formattedKelas = kelasList.map((k: any) => ({
+    const formattedKelas = kelasRows.map((k) => ({
       id: k.id,
       nama_kelas: k.nama_kelas,
       created_at: k.created_at,
-      jumlah_siswa: k.siswa_count?.[0]?.count || 0
+      jumlah_siswa: k.jumlah_siswa || 0
     }))
 
     return NextResponse.json({
@@ -67,7 +55,6 @@ export async function GET() {
   }
 }
 
-// POST /api/guru/kelas - Create new kelas
 export async function POST(request: Request) {
   try {
     const session = await getSession()
@@ -86,12 +73,11 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
 
-    // Parse request body
     const body = await request.json()
 
-    // Validation
     if (!body.nama_kelas || typeof body.nama_kelas !== 'string' || !body.nama_kelas.trim()) {
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'Nama kelas harus diisi' } },
@@ -101,13 +87,7 @@ export async function POST(request: Request) {
 
     const namaKelas = body.nama_kelas.trim()
 
-    // Check if kelas with same name already exists for this guru
-    const { data: existingKelas } = await supabase
-      .from('kelas')
-      .select('id')
-      .eq('nama_kelas', namaKelas)
-      .eq('created_by', session.user.id)
-      .single()
+    const existingKelas = db.prepare('SELECT id FROM kelas WHERE nama_kelas = ? AND created_by = ?').get(namaKelas, guruId) as { id: string } | undefined
 
     if (existingKelas) {
       return NextResponse.json(
@@ -116,23 +96,15 @@ export async function POST(request: Request) {
       )
     }
 
-    // Insert new kelas
-    const { data: newKelas, error } = await supabase
-      .from('kelas')
-      .insert({
-        nama_kelas: namaKelas,
-        created_by: session.user.id
-      })
-      .select('id, nama_kelas, created_at')
-      .single()
+    const id = generateId()
+    const now = getTimestamp()
 
-    if (error) {
-      console.error('Error creating kelas:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal membuat kelas' } },
-        { status: 500 }
-      )
-    }
+    db.prepare(`
+      INSERT INTO kelas (id, nama_kelas, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(id, namaKelas, guruId, now, now)
+
+    const newKelas = db.prepare('SELECT id, nama_kelas, created_at FROM kelas WHERE id = ?').get(id) as { id: string; nama_kelas: string; created_at: string }
 
     return NextResponse.json({
       success: true,

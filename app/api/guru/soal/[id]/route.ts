@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
+import { generateId, getTimestamp } from '@/lib/db/utils'
 import { NextResponse } from 'next/server'
 
 interface RouteParams {
@@ -17,27 +18,21 @@ export async function GET(request: Request, { params }: RouteParams) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
     const { id } = await params
 
-    const { data: soal, error } = await supabase
-      .from('soal')
-      .select(`
-        *,
-        ujian:ujian_id (
-          id,
-          judul,
-          status,
-          created_by
-        )
-      `)
-      .eq('id', id)
-      .single()
+    const soal = db.prepare(`
+      SELECT s.*, u.id as ujian_id, u.judul, u.status, u.created_by as ujian_created_by
+      FROM soal s
+      JOIN ujian u ON s.ujian_id = u.id
+      WHERE s.id = ?
+    `).get(id) as any
 
-    if (error || !soal || !soal.ujian || soal.ujian.created_by !== session.user.id) {
+    if (!soal || soal.ujian_created_by !== guruId) {
       return NextResponse.json(
-        { success: false, error: { code: error || !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: error || !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
-        { status: error || !soal ? 404 : 403 }
+        { success: false, error: { code: !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
+        { status: !soal ? 404 : 403 }
       )
     }
 
@@ -65,7 +60,8 @@ export async function PUT(request: Request, { params }: RouteParams) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
     const { id } = await params
     const body = await request.json()
     const { teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan } = body
@@ -77,64 +73,52 @@ export async function PUT(request: Request, { params }: RouteParams) {
       )
     }
 
-    const { data: soal, error: fetchError } = await supabase
-      .from('soal')
-      .select(`
-        *,
-        ujian:ujian_id (
-          id,
-          status,
-          created_by
-        )
-      `)
-      .eq('id', id)
-      .single()
+    const soal = db.prepare(`
+      SELECT s.*, u.status, u.created_by as ujian_created_by
+      FROM soal s
+      JOIN ujian u ON s.ujian_id = u.id
+      WHERE s.id = ?
+    `).get(id) as any
 
-    if (fetchError || !soal || !soal.ujian || soal.ujian.created_by !== session.user.id) {
+    if (!soal || soal.ujian_created_by !== guruId) {
       return NextResponse.json(
-        { success: false, error: { code: fetchError || !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: fetchError || !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
-        { status: fetchError || !soal ? 404 : 403 }
+        { success: false, error: { code: !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
+        { status: !soal ? 404 : 403 }
       )
     }
 
-    if (soal.ujian.status === 'aktif') {
+    if (soal.status === 'aktif') {
       return NextResponse.json(
         { success: false, error: { code: 'UJIAN_ACTIVE', message: 'Soal tidak dapat diubah karena ujian sedang aktif' } },
         { status: 400 }
       )
     }
 
-    const { data: updatedSoal, error } = await supabase
-      .from('soal')
-      .update({
-        teks_soal,
-        gambar_url: gambar_url || null,
-        jawaban_benar,
-        pengecoh_1,
-        pengecoh_2,
-        pengecoh_3: pengecoh_3 || null,
-        pengecoh_4: pengecoh_4 || null,
-        urutan: urutan !== undefined ? urutan : soal.urutan
-      })
-      .eq('id', id)
-      .select()
-      .single()
+    const now = getTimestamp()
 
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
+    db.prepare(`
+      UPDATE soal
+      SET teks_soal = ?, gambar_url = ?, jawaban_benar = ?, pengecoh_1 = ?, pengecoh_2 = ?, pengecoh_3 = ?, pengecoh_4 = ?, urutan = ?, updated_at = ?
+      WHERE id = ?
+    `).run(
+      teks_soal,
+      gambar_url || null,
+      jawaban_benar,
+      pengecoh_1,
+      pengecoh_2,
+      pengecoh_3 || null,
+      pengecoh_4 || null,
+      urutan !== undefined ? urutan : soal.urutan,
+      now,
+      id
+    )
 
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'guru',
-      action: 'update',
-      entity_type: 'soal',
-      entity_id: id,
-      details: { teks_soal: teks_soal.substring(0, 50) }
-    })
+    const updatedSoal = db.prepare('SELECT * FROM soal WHERE id = ?').get(id) as any
+
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), guruId, 'update', 'soal', id, JSON.stringify({ teks_soal: teks_soal.substring(0, 50) }), now)
 
     return NextResponse.json({
       success: true,
@@ -163,56 +147,38 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
     const { id } = await params
 
-    const { data: soal, error: fetchError } = await supabase
-      .from('soal')
-      .select(`
-        *,
-        ujian:ujian_id (
-          id,
-          status,
-          created_by
-        )
-      `)
-      .eq('id', id)
-      .single()
+    const soal = db.prepare(`
+      SELECT s.*, u.status, u.created_by as ujian_created_by
+      FROM soal s
+      JOIN ujian u ON s.ujian_id = u.id
+      WHERE s.id = ?
+    `).get(id) as any
 
-    if (fetchError || !soal || !soal.ujian || soal.ujian.created_by !== session.user.id) {
+    if (!soal || soal.ujian_created_by !== guruId) {
       return NextResponse.json(
-        { success: false, error: { code: fetchError || !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: fetchError || !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
-        { status: fetchError || !soal ? 404 : 403 }
+        { success: false, error: { code: !soal ? 'NOT_FOUND' : 'FORBIDDEN', message: !soal ? 'Soal tidak ditemukan' : 'Akses ditolak' } },
+        { status: !soal ? 404 : 403 }
       )
     }
 
-    if (soal.ujian.status === 'aktif') {
+    if (soal.status === 'aktif') {
       return NextResponse.json(
         { success: false, error: { code: 'UJIAN_ACTIVE', message: 'Soal tidak dapat dihapus karena ujian sedang aktif' } },
         { status: 400 }
       )
     }
 
-    const { error } = await supabase
-      .from('soal')
-      .delete()
-      .eq('id', id)
+    db.prepare('DELETE FROM soal WHERE id = ?').run(id)
 
-    if (error) {
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
-
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'guru',
-      action: 'delete',
-      entity_type: 'soal',
-      entity_id: id,
-      details: { ujian_id: soal.ujian_id }
-    })
+    const now = getTimestamp()
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), guruId, 'delete', 'soal', id, JSON.stringify({ ujian_id: soal.ujian_id }), now)
 
     return NextResponse.json({
       success: true,

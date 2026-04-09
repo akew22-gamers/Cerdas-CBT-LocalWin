@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
@@ -19,22 +19,14 @@ export async function GET() {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
 
-    const { data: activeUjian } = await supabase
-      .from('ujian')
-      .select(`
-        id,
-        judul,
-        status,
-        ujian_kelas!inner(
-          kelas_id
-        )
-      `)
-      .eq('created_by', session.user.id)
-      .eq('status', 'aktif')
+    const activeUjian = db.prepare(`
+      SELECT id, judul, status FROM ujian 
+      WHERE created_by = ? AND status = 'aktif'
+    `).all(session.user.id) as any[]
 
-    if (!activeUjian) {
+    if (!activeUjian || activeUjian.length === 0) {
       return NextResponse.json({
         success: true,
         data: {
@@ -44,17 +36,16 @@ export async function GET() {
       })
     }
 
-    // OPTIMIZATION: Single query instead of N+1 loop
     const ujianIds = activeUjian.map((u: any) => u.id)
+    const placeholders = ujianIds.map(() => '?').join(', ')
 
-    const { data: hasilData } = await supabase
-      .from('hasil_ujian')
-      .select('ujian_id')
-      .in('ujian_id', ujianIds)
-      .eq('is_submitted', false)
+    const hasilData = db.prepare(`
+      SELECT ujian_id FROM hasil_ujian 
+      WHERE ujian_id IN (${placeholders}) AND is_submitted = 0
+    `).all(...ujianIds) as any[]
 
     const countMap: Record<string, number> = {}
-    for (const hasil of hasilData || []) {
+    for (const hasil of hasilData) {
       countMap[hasil.ujian_id] = (countMap[hasil.ujian_id] || 0) + 1
     }
 

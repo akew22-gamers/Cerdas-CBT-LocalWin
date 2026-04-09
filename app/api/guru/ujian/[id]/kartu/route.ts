@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 import { KartuUjianData, QRCardData } from '@/types/kartu'
 
@@ -49,29 +49,27 @@ export async function GET(
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
     const { id } = await params
 
-    const { data: ujian, error: ujianError } = await supabase
-      .from('ujian')
-      .select('id, kode_ujian, judul, durasi')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const ujian = db.prepare(`
+      SELECT id, kode_ujian, judul, durasi 
+      FROM ujian 
+      WHERE id = ? AND created_by = ?
+    `).get(id, session.user.id) as any
 
-    if (ujianError || !ujian) {
+    if (!ujian) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Ujian tidak ditemukan' } },
         { status: 404 }
       )
     }
 
-    const { data: ujianKelasData, error: ujianKelasError } = await supabase
-      .from('ujian_kelas')
-      .select('kelas_id')
-      .eq('ujian_id', id)
+    const ujianKelasData = db.prepare(`
+      SELECT kelas_id FROM ujian_kelas WHERE ujian_id = ?
+    `).all(id) as any[]
 
-    if (ujianKelasError || !ujianKelasData || ujianKelasData.length === 0) {
+    if (!ujianKelasData || ujianKelasData.length === 0) {
       return NextResponse.json({
         success: true,
         data: []
@@ -79,36 +77,24 @@ export async function GET(
     }
 
     const kelasIds = ujianKelasData.map(uk => uk.kelas_id)
+    const placeholders = kelasIds.map(() => '?').join(', ')
 
-    const { data: siswaData, error: siswaError } = await supabase
-      .from('siswa')
-      .select(`
-        id,
-        nisn,
-        nama,
-        kelas_id,
-        kelas:kelas(id, nama_kelas)
-      `)
-      .in('kelas_id', kelasIds)
-      .order('nisn', { ascending: true })
+    const siswaData = db.prepare(`
+      SELECT s.id, s.nisn, s.nama, s.kelas_id, k.nama_kelas as kelas_nama
+      FROM siswa s
+      JOIN kelas k ON s.kelas_id = k.id
+      WHERE s.kelas_id IN (${placeholders})
+      ORDER BY s.nisn ASC
+    `).all(...kelasIds) as any[]
 
-    if (siswaError) {
-      console.error('Error fetching siswa:', siswaError)
-      return NextResponse.json(
-        { success: false, error: { code: 'INTERNAL_ERROR', message: 'Gagal mengambil data siswa' } },
-        { status: 500 }
-      )
-    }
+    const sekolahData = db.prepare(`
+      SELECT nama_sekolah, logo_url 
+      FROM identitas_sekolah 
+      ORDER BY created_at DESC 
+      LIMIT 1
+    `).get() as any
 
-    const { data: sekolahData, error: sekolahError } = await supabase
-      .from('identitas_sekolah')
-      .select('nama_sekolah, logo_url')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (sekolahError) {
-      console.error('Error fetching school info:', sekolahError)
+    if (!sekolahData) {
       return NextResponse.json(
         { success: false, error: { code: 'INTERNAL_ERROR', message: 'Gagal mengambil data sekolah' } },
         { status: 500 }
@@ -116,10 +102,10 @@ export async function GET(
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || ''
-    const logoDataUrl = await convertLogoToBase64(sekolahData?.logo_url || null)
+    const logoDataUrl = await convertLogoToBase64(sekolahData.logo_url)
     const kartuData: KartuUjianData[] = []
 
-    for (const siswa of siswaData || []) {
+    for (const siswa of siswaData) {
       const qrCardData: QRCardData = {
         type: 'exam_login',
         u: ujian.id,
@@ -129,17 +115,16 @@ export async function GET(
       }
 
       const loginUrl = `${baseUrl}/ujian?u=${ujian.id}&s=${siswa.id}&k=${ujian.kode_ujian}`
-      const kelasData = Array.isArray(siswa.kelas) ? siswa.kelas[0] : siswa.kelas
 
       kartuData.push({
         siswa: {
           id: siswa.id,
           nisn: siswa.nisn,
           nama: siswa.nama,
-          kelas: kelasData ? {
-            id: kelasData.id,
-            nama_kelas: kelasData.nama_kelas
-          } : null
+          kelas: {
+            id: siswa.kelas_id,
+            nama_kelas: siswa.kelas_nama
+          }
         },
         ujian: {
           id: ujian.id,
@@ -148,7 +133,7 @@ export async function GET(
           durasi: ujian.durasi
         },
         sekolah: {
-          nama_sekolah: sekolahData?.nama_sekolah || '',
+          nama_sekolah: sekolahData.nama_sekolah,
           logo_url: logoDataUrl
         },
         qrData: JSON.stringify(qrCardData),

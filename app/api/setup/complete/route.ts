@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
+import { generateId, toJsonField, getTimestamp } from '@/lib/db/utils'
 import bcrypt from 'bcryptjs'
 import type { ApiSuccessResponse, ApiErrorResponse } from '@/types/api'
 import type { SetupCompleteRequest } from '@/types/api'
@@ -29,23 +30,9 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
 
-    const { data: existingSetup, error: existingError } = await supabase
-      .from('identitas_sekolah')
-      .select('id, setup_wizard_completed')
-      .maybeSingle()
-
-    if (existingError && existingError.code !== 'PGRST116') {
-      console.error('Error checking existing setup:', existingError)
-      return NextResponse.json<ApiErrorResponse>({
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Gagal memeriksa status setup'
-        }
-      }, { status: 500 })
-    }
+    const existingSetup = db.prepare('SELECT id, setup_wizard_completed FROM identitas_sekolah LIMIT 1').get() as { id: string; setup_wizard_completed: number } | undefined
 
     if (existingSetup?.setup_wizard_completed) {
       return NextResponse.json<ApiErrorResponse>({
@@ -59,101 +46,95 @@ export async function POST(request: Request) {
 
     const passwordHash = await bcrypt.hash(super_admin.password, 10)
 
-    const { data: existingAdmin } = await supabase
-      .from('super_admin')
-      .select('id')
-      .maybeSingle()
+    const existingAdmin = db.prepare('SELECT id FROM super_admin LIMIT 1').get() as { id: string } | undefined
 
     if (existingAdmin) {
-      await supabase.from('super_admin').delete().eq('id', existingAdmin.id)
+      db.prepare('DELETE FROM super_admin WHERE id = ?').run(existingAdmin.id)
     }
 
-    const { data: adminData, error: adminError } = await supabase
-      .from('super_admin')
-      .insert({
-        username: super_admin.username,
-        password_hash: passwordHash
-      })
-      .select('id, username')
-      .single()
+    const adminId = generateId()
+    db.prepare(`
+      INSERT INTO super_admin (id, username, password_hash)
+      VALUES (?, ?, ?)
+    `).run(adminId, super_admin.username, passwordHash)
 
-    if (adminError) {
-      console.error('Super-admin creation error:', adminError)
-      return NextResponse.json<ApiErrorResponse>({
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Gagal membuat akun super-admin'
-        }
-      }, { status: 500 })
-    }
+    const timestamp = getTimestamp()
 
-    let sekolahData
-    let sekolahError
+    let sekolahData: { id: string; nama_sekolah: string; npsn?: string }
 
     if (existingSetup) {
-      const result = await supabase
-        .from('identitas_sekolah')
-        .update({
-          nama_sekolah: sekolah.nama_sekolah,
-          npsn: sekolah.npsn || null,
-          alamat: sekolah.alamat || null,
-          telepon: sekolah.telepon || null,
-          email: sekolah.email || null,
-          website: sekolah.website || null,
-          kepala_sekolah: sekolah.kepala_sekolah || null,
-          tahun_ajaran: sekolah.tahun_ajaran,
-          logo_url: sekolah.logo_url || null,
-          setup_wizard_completed: true,
-          updated_by: adminData.id
-        })
-        .eq('id', existingSetup.id!)
-        .select('id, nama_sekolah, npsn')
-        .single()
-      sekolahData = result.data
-      sekolahError = result.error
+      db.prepare(`
+        UPDATE identitas_sekolah SET
+          nama_sekolah = ?,
+          npsn = ?,
+          alamat = ?,
+          telepon = ?,
+          email = ?,
+          website = ?,
+          kepala_sekolah = ?,
+          tahun_ajaran = ?,
+          logo_url = ?,
+          setup_wizard_completed = 1,
+          updated_by = ?,
+          updated_at = ?
+        WHERE id = ?
+      `).run(
+        sekolah.nama_sekolah,
+        sekolah.npsn || null,
+        sekolah.alamat || null,
+        sekolah.telepon || null,
+        sekolah.email || null,
+        sekolah.website || null,
+        sekolah.kepala_sekolah || null,
+        sekolah.tahun_ajaran,
+        sekolah.logo_url || null,
+        adminId,
+        timestamp,
+        existingSetup.id
+      )
+
+      sekolahData = {
+        id: existingSetup.id,
+        nama_sekolah: sekolah.nama_sekolah,
+        npsn: sekolah.npsn ?? undefined
+      }
     } else {
-      const result = await supabase
-        .from('identitas_sekolah')
-        .insert({
-          nama_sekolah: sekolah.nama_sekolah,
-          npsn: sekolah.npsn || null,
-          alamat: sekolah.alamat || null,
-          telepon: sekolah.telepon || null,
-          email: sekolah.email || null,
-          website: sekolah.website || null,
-          kepala_sekolah: sekolah.kepala_sekolah || null,
-          tahun_ajaran: sekolah.tahun_ajaran,
-          logo_url: sekolah.logo_url || null,
-          setup_wizard_completed: true,
-          updated_by: adminData.id
-        })
-        .select('id, nama_sekolah, npsn')
-        .single()
-      sekolahData = result.data
-      sekolahError = result.error
+      const schoolId = generateId()
+      db.prepare(`
+        INSERT INTO identitas_sekolah (
+          id, nama_sekolah, npsn, alamat, telepon, email, website,
+          kepala_sekolah, tahun_ajaran, logo_url, setup_wizard_completed, updated_by, created_at, updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
+      `).run(
+        schoolId,
+        sekolah.nama_sekolah,
+        sekolah.npsn || null,
+        sekolah.alamat || null,
+        sekolah.telepon || null,
+        sekolah.email || null,
+        sekolah.website || null,
+        sekolah.kepala_sekolah || null,
+        sekolah.tahun_ajaran,
+        sekolah.logo_url || null,
+        adminId,
+        timestamp,
+        timestamp,
+        timestamp
+      )
+
+      sekolahData = {
+        id: schoolId,
+        nama_sekolah: sekolah.nama_sekolah,
+        npsn: sekolah.npsn ?? undefined
+      }
     }
 
-    if (sekolahError || !sekolahData) {
-      console.error('Identitas sekolah creation error:', sekolahError)
-      await supabase.from('super_admin').delete().eq('id', adminData.id)
-      return NextResponse.json<ApiErrorResponse>({
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Gagal menyimpan data sekolah'
-        }
-      }, { status: 500 })
-    }
-
-    await supabase.from('audit_log').insert({
-      user_id: adminData.id,
-      role: 'super_admin',
-      action: 'setup_completed',
-      entity_type: 'identitas_sekolah',
-      entity_id: sekolahData!.id,
-      details: { username: super_admin.username }
-    })
+    const auditLogId = generateId()
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, 'super_admin', 'setup_completed', 'identitas_sekolah', ?, ?, ?)
+    `).run(auditLogId, adminId, sekolahData.id, toJsonField({ username: super_admin.username }), timestamp)
 
     return NextResponse.json<ApiSuccessResponse<{
       message: string
@@ -164,14 +145,10 @@ export async function POST(request: Request) {
       data: {
         message: 'Setup completed successfully',
         super_admin: {
-          id: adminData.id,
-          username: adminData.username
+          id: adminId,
+          username: super_admin.username
         },
-        sekolah: {
-          id: sekolahData!.id,
-          nama_sekolah: sekolahData!.nama_sekolah,
-          npsn: sekolahData!.npsn ?? undefined
-        }
+        sekolah: sekolahData
       }
     })
   } catch (error) {

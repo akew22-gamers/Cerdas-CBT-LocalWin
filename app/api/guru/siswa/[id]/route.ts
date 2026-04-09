@@ -1,12 +1,12 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
+import { generateId, getTimestamp } from '@/lib/db/utils'
 import { NextResponse } from 'next/server'
 
 interface RouteParams {
   params: Promise<{ id: string }>
 }
 
-// GET - Get single siswa detail with kelas
 export async function GET(request: Request, { params }: RouteParams) {
   try {
     const session = await getSession()
@@ -24,27 +24,30 @@ export async function GET(request: Request, { params }: RouteParams) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
     const { id } = await params
 
-    const { data: siswa, error } = await supabase
-      .from('siswa')
-      .select(`
-        *,
-        kelas:kelas_id (
-          id,
-          nama_kelas
-        )
-      `)
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const siswaRow = db.prepare(`
+      SELECT s.*, k.nama_kelas as kelas_nama
+      FROM siswa s
+      LEFT JOIN kelas k ON s.kelas_id = k.id
+      WHERE s.id = ? AND s.created_by = ?
+    `).get(id, guruId) as any
 
-    if (error || !siswa) {
+    if (!siswaRow) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Siswa tidak ditemukan' } },
         { status: 404 }
       )
+    }
+
+    const siswa = {
+      ...siswaRow,
+      kelas: siswaRow.kelas_nama ? {
+        id: siswaRow.kelas_id,
+        nama_kelas: siswaRow.kelas_nama
+      } : null
     }
 
     return NextResponse.json({
@@ -63,7 +66,6 @@ export async function GET(request: Request, { params }: RouteParams) {
   }
 }
 
-// PUT - Update siswa data
 export async function PUT(request: Request, { params }: RouteParams) {
   try {
     const session = await getSession()
@@ -81,13 +83,13 @@ export async function PUT(request: Request, { params }: RouteParams) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
     const { id } = await params
 
     const body = await request.json()
     const { nama, kelas_id } = body
 
-    // Validation
     if (!nama) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_FIELDS', message: 'Nama harus diisi' } },
@@ -95,13 +97,7 @@ export async function PUT(request: Request, { params }: RouteParams) {
       )
     }
 
-    // Check if siswa exists and belongs to this guru
-    const { data: existingSiswa } = await supabase
-      .from('siswa')
-      .select('id, nisn')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const existingSiswa = db.prepare('SELECT id, nisn FROM siswa WHERE id = ? AND created_by = ?').get(id, guruId) as { id: string; nisn: string } | undefined
 
     if (!existingSiswa) {
       return NextResponse.json(
@@ -110,39 +106,33 @@ export async function PUT(request: Request, { params }: RouteParams) {
       )
     }
 
-    const { data: updatedSiswa, error } = await supabase
-      .from('siswa')
-      .update({
-        nama,
-        kelas_id: kelas_id || null
-      })
-      .eq('id', id)
-      .select(`
-        *,
-        kelas:kelas_id (
-          id,
-          nama_kelas
-        )
-      `)
-      .single()
+    const now = getTimestamp()
 
-    if (error) {
-      console.error('Error updating siswa:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
+    db.prepare(`
+      UPDATE siswa
+      SET nama = ?, kelas_id = ?, updated_at = ?
+      WHERE id = ? AND created_by = ?
+    `).run(nama, kelas_id || null, now, id, guruId)
+
+    const updatedSiswaRow = db.prepare(`
+      SELECT s.*, k.nama_kelas as kelas_nama
+      FROM siswa s
+      LEFT JOIN kelas k ON s.kelas_id = k.id
+      WHERE s.id = ?
+    `).get(id) as any
+
+    const updatedSiswa = {
+      ...updatedSiswaRow,
+      kelas: updatedSiswaRow.kelas_nama ? {
+        id: updatedSiswaRow.kelas_id,
+        nama_kelas: updatedSiswaRow.kelas_nama
+      } : null
     }
 
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'guru',
-      action: 'update',
-      entity_type: 'siswa',
-      entity_id: id,
-      details: { nisn: existingSiswa.nisn, nama }
-    })
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), guruId, 'update', 'siswa', id, JSON.stringify({ nisn: existingSiswa.nisn, nama }), now)
 
     return NextResponse.json({
       success: true,
@@ -177,16 +167,11 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
     const { id } = await params
 
-    // Check if siswa exists and belongs to this guru
-    const { data: existingSiswa } = await supabase
-      .from('siswa')
-      .select('id, nisn, nama')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const existingSiswa = db.prepare('SELECT id, nisn, nama FROM siswa WHERE id = ? AND created_by = ?').get(id, guruId) as { id: string; nisn: string; nama: string } | undefined
 
     if (!existingSiswa) {
       return NextResponse.json(
@@ -195,28 +180,13 @@ export async function DELETE(request: Request, { params }: RouteParams) {
       )
     }
 
-    const { error } = await supabase
-      .from('siswa')
-      .delete()
-      .eq('id', id)
+    db.prepare('DELETE FROM siswa WHERE id = ?').run(id)
 
-    if (error) {
-      console.error('Error deleting siswa:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
-
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'guru',
-      action: 'delete',
-      entity_type: 'siswa',
-      entity_id: id,
-      details: { nisn: existingSiswa.nisn, nama: existingSiswa.nama }
-    })
+    const now = getTimestamp()
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), guruId, 'delete', 'siswa', id, JSON.stringify({ nisn: existingSiswa.nisn, nama: existingSiswa.nama }), now)
 
     return NextResponse.json({
       success: true,

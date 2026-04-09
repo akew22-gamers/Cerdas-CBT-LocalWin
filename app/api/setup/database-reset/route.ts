@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
+import { getDb } from '@/lib/db/client'
 import type { ApiSuccessResponse, ApiErrorResponse } from '@/types/api'
 
 export async function POST() {
   try {
-    const { createAdminClient } = await import('@/lib/supabase/admin')
-    const supabase = createAdminClient()
+    const db = getDb()
 
     const tablesToDelete = [
       'siswa',
@@ -22,10 +22,10 @@ export async function POST() {
     ]
 
     for (const table of tablesToDelete) {
-      await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      db.prepare(`DELETE FROM ${table}`).run()
     }
 
-    await supabase.from('identitas_sekolah').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    db.prepare('DELETE FROM identitas_sekolah').run()
 
     return NextResponse.json<ApiSuccessResponse<{ message: string }>>({
       success: true,

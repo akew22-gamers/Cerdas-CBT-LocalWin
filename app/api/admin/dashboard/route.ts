@@ -1,82 +1,77 @@
-import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
+import { getSession } from '@/lib/auth/session';
+import { getDb } from '@/lib/db/client';
+import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
+    const db = getDb();
 
-    // OPTIMIZATION: Parallelize independent queries
-    const [guruResult, siswaResult, ujianResult, auditResult] = await Promise.all([
-      supabase.from('guru').select('id, nama, created_at'),
-      supabase.from('siswa').select('id'),
-      supabase.from('ujian').select('id, status'),
-      supabase.from('audit_log')
-        .select('id, role, action, entity_type, details, created_at')
-        .order('created_at', { ascending: false })
-        .limit(5)
-    ])
+    const guruCount = db.prepare('SELECT COUNT(*) as count FROM guru').get() as { count: number };
+    const siswaCount = db.prepare('SELECT COUNT(*) as count FROM siswa').get() as { count: number };
+    const ujianCount = db.prepare('SELECT COUNT(*) as count FROM ujian').get() as { count: number };
+    const ujianAktifCount = db.prepare("SELECT COUNT(*) as count FROM ujian WHERE status = 'aktif'").get() as { count: number };
 
-    const { data: guruData, error: guruError } = guruResult
-    const { data: siswaData, error: siswaError } = siswaResult
-    const { data: ujianData, error: ujianError } = ujianResult
-    const { data: auditLogs, error: auditError } = auditResult
+    const recentGuru = db.prepare(`
+      SELECT id, nama, created_at
+      FROM guru
+      ORDER BY created_at DESC
+      LIMIT 5
+    `).all() as Array<{ id: string; nama: string; created_at: string }>;
 
-    if (guruError) throw guruError
-    if (siswaError) throw siswaError
-    if (ujianError) throw ujianError
-    if (auditError) console.error('Error fetching audit logs:', auditError)
+    const auditLogs = db.prepare(`
+      SELECT id, role, action, entity_type, details, created_at
+      FROM audit_log
+      ORDER BY created_at DESC
+      LIMIT 5
+    `).all() as Array<{ 
+      id: string; 
+      role: string; 
+      action: string; 
+      entity_type: string | null; 
+      details: string | null; 
+      created_at: string 
+    }>;
 
-    const ujianAktif = (ujianData || []).filter((u: any) => u.status === 'aktif').length
-    const recentGuru = (guruData || [])
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 5)
-      .map((g: any) => ({
-        id: g.id,
-        nama: g.nama,
-        created_at: g.created_at
-      }))
-
-    const formattedAuditLogs = (auditLogs || []).map((log: any) => ({
+    const formattedAuditLogs = auditLogs.map(log => ({
       id: log.id,
       role: log.role,
       action: log.action,
       entity_type: log.entity_type,
-      details: log.details,
+      details: log.details ? JSON.parse(log.details) : null,
       created_at: log.created_at
-    }))
+    }));
 
     return NextResponse.json({
       success: true,
       data: {
-        total_guru: guruData.length,
-        total_siswa: siswaData.length,
-        total_ujian: ujianData.length,
-        ujian_aktif: ujianAktif,
+        total_guru: guruCount.count,
+        total_siswa: siswaCount.count,
+        total_ujian: ujianCount.count,
+        ujian_aktif: ujianAktifCount.count,
         recent_guru: recentGuru,
         recent_audit_logs: formattedAuditLogs
       }
-    })
+    });
 
-  } catch (error: any) {
-    console.error('Dashboard error:', error)
+  } catch (error) {
+    console.error('Dashboard error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }

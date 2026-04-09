@@ -1,39 +1,28 @@
 import { NextResponse } from 'next/server'
+import { getDb } from '@/lib/db/client'
 import type { ApiSuccessResponse, ApiErrorResponse } from '@/types/api'
 
 
 export async function GET() {
   try {
-    const { createAdminClient } = await import('@/lib/supabase/admin')
-    const supabase = createAdminClient()
-
-    const { data, error } = await supabase
-      .from('identitas_sekolah')
-      .select('id, setup_wizard_completed, nama_sekolah')
-      .limit(1)
-
-    if (error) {
-      if (error.code === '42P01') {
-        return NextResponse.json<ApiSuccessResponse<{ state: 'empty'; message: string }>>({
-          success: true,
-          data: {
-            state: 'empty',
-            message: 'Tabel belum dibuat'
-          }
-        })
-      }
-
-      return NextResponse.json<ApiErrorResponse>({
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Gagal memeriksa status database'
+    const db = getDb()
+    
+    const tablesExist = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='identitas_sekolah'").get()
+    
+    if (!tablesExist) {
+      return NextResponse.json<ApiSuccessResponse<{ state: 'empty'; message: string }>>({
+        success: true,
+        data: {
+          state: 'empty',
+          message: 'Tabel belum dibuat'
         }
-      }, { status: 500 })
+      })
     }
 
-    if (data && data.length > 0) {
-      const hasData = data.some(row => row.setup_wizard_completed || row.nama_sekolah)
+    const rows = db.prepare('SELECT id, setup_wizard_completed, nama_sekolah FROM identitas_sekolah LIMIT 1').all() as Array<{ setup_wizard_completed: number; nama_sekolah: string | null }>
+
+    if (rows && rows.length > 0) {
+      const hasData = rows.some(row => row.setup_wizard_completed || row.nama_sekolah)
       
       return NextResponse.json<ApiSuccessResponse<{ state: 'ready'; message: string; hasSetupData: boolean }>>({
         success: true,

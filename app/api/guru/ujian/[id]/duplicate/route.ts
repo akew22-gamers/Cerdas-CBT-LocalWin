@@ -1,8 +1,7 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 
-// POST /api/guru/ujian/[id]/duplicate - Duplicate ujian with all soal
 export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -24,86 +23,86 @@ export async function POST(
       )
     }
 
-    const supabase = createAdminClient()
-
+    const db = getDb()
     const { id } = await params
 
-    // Get original ujian
-    const { data: originalUjian, error: fetchError } = await supabase
-      .from('ujian')
-      .select('id, judul, durasi, jumlah_opsi, show_result')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const originalUjian = db.prepare(`
+      SELECT id, judul, durasi, jumlah_opsi, show_result 
+      FROM ujian 
+      WHERE id = ? AND created_by = ?
+    `).get(id, session.user.id) as any
 
-    if (fetchError || !originalUjian) {
+    if (!originalUjian) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Ujian tidak ditemukan' } },
         { status: 404 }
       )
     }
 
-    // Get all soal from original ujian
-    const { data: originalSoal, error: soalFetchError } = await supabase
-      .from('soal')
-      .select('teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan')
-      .eq('ujian_id', id)
-      .order('urutan', { ascending: true })
+    const originalSoal = db.prepare(`
+      SELECT teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan
+      FROM soal
+      WHERE ujian_id = ?
+      ORDER BY urutan ASC
+    `).all(id) as any[]
 
-    if (soalFetchError) {
-      console.error('Error fetching soal:', soalFetchError)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal mengambil soal' } },
-        { status: 500 }
-      )
-    }
+    const timestamp = Date.now().toString().slice(-6)
+    const randomCode = Math.random().toString(36).substring(2, 5).toUpperCase()
+    const kode_ujian = `UJIAN-${timestamp}-${randomCode}`
 
-    // Create duplicated ujian (kode_ujian auto-generated)
-    const { data: newUjian, error: insertError } = await supabase
-      .from('ujian')
-      .insert({
-        judul: `${originalUjian.judul} (Copy)`,
-        durasi: originalUjian.durasi,
-        jumlah_opsi: originalUjian.jumlah_opsi,
-        show_result: originalUjian.show_result,
-        created_by: session.user.id
-      })
-      .select('id, kode_ujian, judul, status')
-      .single()
+    const { v4: uuidv4 } = await import('uuid')
+    const newUjianId = uuidv4()
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
 
-    if (insertError) {
-      console.error('Error creating duplicated ujian:', insertError)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal menduplikasi ujian' } },
-        { status: 500 }
-      )
-    }
+    db.prepare(`
+      INSERT INTO ujian (id, kode_ujian, judul, durasi, jumlah_opsi, status, show_result, created_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 'nonaktif', ?, ?, ?, ?)
+    `).run(
+      newUjianId,
+      kode_ujian,
+      `${originalUjian.judul} (Copy)`,
+      originalUjian.durasi,
+      originalUjian.jumlah_opsi,
+      originalUjian.show_result,
+      session.user.id,
+      now,
+      now
+    )
 
-    // Duplicate all soal
     let soalCount = 0
     if (originalSoal && originalSoal.length > 0) {
-      const duplicatedSoal = originalSoal.map((soal: any) => ({
-        ujian_id: newUjian.id,
-        teks_soal: soal.teks_soal,
-        gambar_url: soal.gambar_url,
-        jawaban_benar: soal.jawaban_benar,
-        pengecoh_1: soal.pengecoh_1,
-        pengecoh_2: soal.pengecoh_2,
-        pengecoh_3: soal.pengecoh_3,
-        pengecoh_4: soal.pengecoh_4,
-        urutan: soal.urutan
-      }))
+      const insertSoal = db.prepare(`
+        INSERT INTO soal (id, ujian_id, teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
 
-      const { error: soalInsertError } = await supabase
-        .from('soal')
-        .insert(duplicatedSoal)
+      const transaction = db.transaction((soalList: any[]) => {
+        for (const soal of soalList) {
+          const soalId = uuidv4()
+          insertSoal.run(
+            soalId,
+            newUjianId,
+            soal.teks_soal,
+            soal.gambar_url,
+            soal.jawaban_benar,
+            soal.pengecoh_1,
+            soal.pengecoh_2,
+            soal.pengecoh_3 || null,
+            soal.pengecoh_4 || null,
+            soal.urutan,
+            now,
+            now
+          )
+        }
+      })
 
-      if (soalInsertError) {
-        console.error('Error duplicating soal:', soalInsertError)
-      } else {
-        soalCount = duplicatedSoal.length
-      }
+      transaction(originalSoal)
+      soalCount = originalSoal.length
     }
+
+    const newUjian = db.prepare(`
+      SELECT id, kode_ujian, judul, status FROM ujian WHERE id = ?
+    `).get(newUjianId) as any
 
     return NextResponse.json({
       success: true,

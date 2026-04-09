@@ -1,115 +1,138 @@
-import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextRequest, NextResponse } from 'next/server'
+import { getSession } from '@/lib/auth/session';
+import { getDb } from '@/lib/db/client';
+import { generateId, getTimestamp, toJsonField } from '@/lib/db/utils';
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession()
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
-      )
+      );
     }
 
     if (session.user.role !== 'siswa') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Akses ditolak' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
-
-    const { id: ujianId } = await params
-    const body = await request.json()
-    const { soal_id, jawaban_pilihan, urutan_soal, urutan_opsi } = body
+    const db = getDb();
+    const { id: ujianId } = await params;
+    const body = await request.json();
+    const { soal_id, jawaban_pilihan, urutan_soal, urutan_opsi } = body;
 
     if (!soal_id || !jawaban_pilihan) {
       return NextResponse.json(
         { success: false, error: { code: 'INVALID_REQUEST', message: 'Data tidak lengkap' } },
         { status: 400 }
-      )
+      );
     }
 
-    const { data: hasil } = await supabase
-      .from('hasil_ujian')
-      .select('is_submitted')
-      .eq('siswa_id', session.user.id)
-      .eq('ujian_id', ujianId)
-      .single()
+    const hasil = db.prepare(`
+      SELECT is_submitted FROM hasil_ujian
+      WHERE siswa_id = ? AND ujian_id = ?
+    `).get(session.user.id, ujianId) as { is_submitted: boolean } | undefined;
 
     if (!hasil) {
       return NextResponse.json(
         { success: false, error: { code: 'EXAM_NOT_STARTED', message: 'Ujian belum dimulai' } },
         { status: 400 }
-      )
+      );
     }
 
     if (hasil.is_submitted) {
       return NextResponse.json(
         { success: false, error: { code: 'EXAM_SUBMITTED', message: 'Ujian sudah dikumpulkan' } },
         { status: 400 }
-      )
+      );
     }
 
-    const { data: soal } = await supabase
-      .from('soal')
-      .select('jawaban_benar')
-      .eq('id', soal_id)
-      .single()
+    const soal = db.prepare(`
+      SELECT jawaban_benar FROM soal WHERE id = ?
+    `).get(soal_id) as { jawaban_benar: string } | undefined;
 
     if (!soal) {
       return NextResponse.json(
         { success: false, error: { code: 'SOAL_NOT_FOUND', message: 'Soal tidak ditemukan' } },
         { status: 404 }
-      )
+      );
     }
 
-    const is_correct = jawaban_pilihan === soal.jawaban_benar
+    const is_correct = jawaban_pilihan === soal.jawaban_benar;
+    const now = getTimestamp();
 
-    const { data, error } = await supabase
-      .from('jawaban_siswa')
-      .upsert({
-        siswa_id: session.user.id,
-        ujian_id: ujianId,
+    const existingJawaban = db.prepare(`
+      SELECT id FROM jawaban_siswa
+      WHERE siswa_id = ? AND soal_id = ?
+    `).get(session.user.id, soal_id) as { id: string } | undefined;
+
+    if (existingJawaban) {
+      db.prepare(`
+        UPDATE jawaban_siswa SET
+          jawaban_pilihan = ?,
+          urutan_soal = ?,
+          urutan_opsi = ?,
+          is_correct = ?,
+          updated_at = ?
+        WHERE id = ?
+      `).run(
+        jawaban_pilihan,
+        urutan_soal || 0,
+        toJsonField(urutan_opsi || []),
+        is_correct,
+        now,
+        existingJawaban.id
+      );
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: existingJawaban.id,
+          is_correct
+        }
+      });
+    } else {
+      const jawabanId = generateId();
+      db.prepare(`
+        INSERT INTO jawaban_siswa (
+          id, siswa_id, ujian_id, soal_id, jawaban_pilihan,
+          urutan_soal, urutan_opsi, is_correct, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        jawabanId,
+        session.user.id,
+        ujianId,
         soal_id,
         jawaban_pilihan,
-        urutan_soal: urutan_soal || 0,
-        urutan_opsi: urutan_opsi ? JSON.stringify(urutan_opsi) : '[]',
+        urutan_soal || 0,
+        toJsonField(urutan_opsi || []),
         is_correct,
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'siswa_id,soal_id'
-      })
-      .select()
-      .single()
+        now,
+        now
+      );
 
-    if (error) {
-      console.error('Error saving jawaban:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'SAVE_JAWABAN_ERROR', message: 'Gagal menyimpan jawaban' } },
-        { status: 500 }
-      )
+      return NextResponse.json({
+        success: true,
+        data: {
+          id: jawabanId,
+          is_correct
+        }
+      });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        id: data.id,
-        is_correct
-      }
-    })
-
   } catch (error: any) {
-    console.error('Save jawaban error:', error)
+    console.error('Save jawaban error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }

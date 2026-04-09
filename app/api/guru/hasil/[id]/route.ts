@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 
 export async function GET(
@@ -23,78 +23,64 @@ export async function GET(
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
     const { id: hasilId } = await params
 
-    const { data: hasil, error: hasilError } = await supabase
-      .from('hasil_ujian')
-      .select(`
-        id,
-        nilai,
-        jumlah_benar,
-        jumlah_salah,
-        waktu_mulai,
-        waktu_selesai,
-        is_submitted,
-        tab_switch_count,
-        fullscreen_exit_count,
-        siswa:siswa_id (
-          id,
-          nisn,
-          nama
-        ),
-        ujian:ujian_id (
-          id,
-          judul,
-          show_result,
-          durasi
-        )
-      `)
-      .eq('id', hasilId)
-      .single()
+    const hasil = db.prepare(`
+      SELECT 
+        h.id,
+        h.nilai,
+        h.jumlah_benar,
+        h.jumlah_salah,
+        h.waktu_mulai,
+        h.waktu_selesai,
+        h.is_submitted,
+        h.tab_switch_count,
+        h.fullscreen_exit_count,
+        h.ujian_id,
+        h.siswa_id,
+        s.nisn as siswa_nisn,
+        s.nama as siswa_nama,
+        u.judul as ujian_judul,
+        u.show_result,
+        u.durasi
+      FROM hasil_ujian h
+      JOIN siswa s ON h.siswa_id = s.id
+      JOIN ujian u ON h.ujian_id = u.id
+      WHERE h.id = ?
+    `).get(hasilId) as any
 
-    if (hasilError || !hasil) {
+    if (!hasil) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Hasil ujian tidak ditemukan' } },
         { status: 404 }
       )
     }
 
-    const ujian = Array.isArray(hasil.ujian) ? hasil.ujian[0] : hasil.ujian
-    const siswa = Array.isArray(hasil.siswa) ? hasil.siswa[0] : hasil.siswa
-
-    if (!ujian) {
-      return NextResponse.json(
-        { success: false, error: { code: 'INVALID_DATA', message: 'Data ujian tidak valid' } },
-        { status: 500 }
-      )
-    }
-
-    const { count: totalSoal } = await supabase
-      .from('soal')
-      .select('*', { count: 'exact', head: true })
-      .eq('ujian_id', (ujian as any).id)
+    const totalSoal = db.prepare(`
+      SELECT COUNT(*) as count FROM soal WHERE ujian_id = ?
+    `).get(hasil.ujian_id) as any
 
     return NextResponse.json({
       success: true,
       data: {
         id: hasil.id,
         siswa: {
-          nisn: (siswa as any)?.nisn || '-',
-          nama: (siswa as any)?.nama || '-'
+          nisn: hasil.siswa_nisn || '-',
+          nama: hasil.siswa_nama || '-'
         },
-        ujian_id: (ujian as any).id,
-        ujian_judul: (ujian as any).judul,
-        durasi: (ujian as any).durasi,
+        ujian_id: hasil.ujian_id,
+        ujian_judul: hasil.ujian_judul,
+        durasi: hasil.durasi,
         nilai: Math.round(hasil.nilai * 100) / 100,
         jumlah_benar: hasil.jumlah_benar,
         jumlah_salah: hasil.jumlah_salah,
-        total_soal: totalSoal || 0,
+        total_soal: totalSoal?.count || 0,
         waktu_mulai: hasil.waktu_mulai,
         waktu_selesai: hasil.waktu_selesai,
         tab_switch_count: hasil.tab_switch_count || 0,
         fullscreen_exit_count: hasil.fullscreen_exit_count || 0,
-        is_submitted: hasil.is_submitted
+        is_submitted: !!hasil.is_submitted
       }
     })
 

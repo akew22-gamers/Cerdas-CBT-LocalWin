@@ -1,75 +1,65 @@
-import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
+import { getSession } from '@/lib/auth/session';
+import { getDb } from '@/lib/db/client';
+import { generateId, getTimestamp } from '@/lib/db/utils';
+import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
+    const db = getDb();
 
-    const { data: sekolah, error } = await supabase
-      .from('identitas_sekolah')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching school identity:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
+    const sekolah = db.prepare(`
+      SELECT * FROM identitas_sekolah
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).get();
 
     return NextResponse.json({
       success: true,
-      data: {
-        sekolah: sekolah || null
-      }
-    })
+      data: { sekolah: sekolah || null }
+    });
 
   } catch (error) {
-    console.error('Error in GET /api/admin/sekolah:', error)
+    console.error('Error in GET /api/admin/sekolah:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }
 
 export async function PUT(request: Request) {
   try {
-    const session = await getSession()
+    const session = await getSession();
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
-      )
+      );
     }
     if (session.user.role !== 'super_admin') {
       return NextResponse.json(
         { success: false, error: { code: 'FORBIDDEN', message: 'Super admin access required' } },
         { status: 403 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
+    const db = getDb();
 
-    const body = await request.json()
+    const body = await request.json();
     const {
       nama_sekolah,
       npsn,
@@ -80,95 +70,97 @@ export async function PUT(request: Request) {
       website,
       kepala_sekolah,
       tahun_ajaran
-    } = body
+    } = body;
 
     if (!nama_sekolah || !tahun_ajaran) {
       return NextResponse.json(
         { success: false, error: { code: 'MISSING_FIELDS', message: 'Nama sekolah dan tahun ajaran harus diisi' } },
         { status: 400 }
-      )
+      );
     }
 
-    const { data: existingData } = await supabase
-      .from('identitas_sekolah')
-      .select('id')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
+    const existingData = db.prepare(`
+      SELECT id FROM identitas_sekolah
+      ORDER BY updated_at DESC
+      LIMIT 1
+    `).get() as { id: string } | undefined;
 
-    let updatedSekolah
+    const now = getTimestamp();
 
     if (existingData) {
-      const { data, error } = await supabase
-        .from('identitas_sekolah')
-        .update({
-          nama_sekolah,
-          npsn: npsn || null,
-          alamat: alamat || null,
-          logo_url: logo_url || null,
-          telepon: telepon || null,
-          email: email || null,
-          website: website || null,
-          kepala_sekolah: kepala_sekolah || null,
-          tahun_ajaran,
-          updated_by: session.user.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingData.id)
-        .select()
-        .single()
+      db.prepare(`
+        UPDATE identitas_sekolah SET
+          nama_sekolah = ?,
+          npsn = ?,
+          alamat = ?,
+          logo_url = ?,
+          telepon = ?,
+          email = ?,
+          website = ?,
+          kepala_sekolah = ?,
+          tahun_ajaran = ?,
+          updated_by = ?,
+          updated_at = ?
+        WHERE id = ?
+      `).run(
+        nama_sekolah,
+        npsn || null,
+        alamat || null,
+        logo_url || null,
+        telepon || null,
+        email || null,
+        website || null,
+        kepala_sekolah || null,
+        tahun_ajaran,
+        session.user.id,
+        now,
+        existingData.id
+      );
 
-      if (error) {
-        console.error('Error updating school identity:', error)
-        return NextResponse.json(
-          { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-          { status: 500 }
-        )
-      }
+      const updatedSekolah = db.prepare('SELECT * FROM identitas_sekolah WHERE id = ?').get(existingData.id);
 
-      updatedSekolah = data
+      return NextResponse.json({
+        success: true,
+        data: { sekolah: updatedSekolah }
+      });
     } else {
-      const { data, error } = await supabase
-        .from('identitas_sekolah')
-        .insert({
-          nama_sekolah,
-          npsn: npsn || null,
-          alamat: alamat || null,
-          logo_url: logo_url || null,
-          telepon: telepon || null,
-          email: email || null,
-          website: website || null,
-          kepala_sekolah: kepala_sekolah || null,
-          tahun_ajaran,
-          updated_by: session.user.id,
-          setup_wizard_completed: true
-        })
-        .select()
-        .single()
+      const id = generateId();
 
-      if (error) {
-        console.error('Error creating school identity:', error)
-        return NextResponse.json(
-          { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-          { status: 500 }
+      db.prepare(`
+        INSERT INTO identitas_sekolah (
+          id, nama_sekolah, npsn, alamat, logo_url, telepon, email, website,
+          kepala_sekolah, tahun_ajaran, updated_by, setup_wizard_completed, created_at, updated_at
         )
-      }
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+      `).run(
+        id,
+        nama_sekolah,
+        npsn || null,
+        alamat || null,
+        logo_url || null,
+        telepon || null,
+        email || null,
+        website || null,
+        kepala_sekolah || null,
+        tahun_ajaran,
+        session.user.id,
+        now,
+        now
+      );
 
-      updatedSekolah = data
+      const newSekolah = db.prepare('SELECT * FROM identitas_sekolah WHERE id = ?').get(id);
+
+      return NextResponse.json({
+        success: true,
+        data: { sekolah: newSekolah }
+      });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: {
-        sekolah: updatedSekolah
-      }
-    })
-
   } catch (error) {
-    console.error('Error in PUT /api/admin/sekolah:', error)
+    console.error('Error in PUT /api/admin/sekolah:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
 }

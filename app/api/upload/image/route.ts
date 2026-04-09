@@ -1,162 +1,118 @@
-import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
-import { NextResponse } from 'next/server'
-import { compressImageToFile, needsCompression, formatFileSize } from '@/lib/utils/compress-image'
+import { getSession } from '@/lib/auth/session';
+import { NextResponse } from 'next/server';
+import { writeFile, mkdir } from 'fs/promises';
+import { existsSync } from 'fs';
+import path from 'path';
+import { getUploadsDir } from '@/lib/db/client';
+import { needsCompression, formatFileSize } from '@/lib/utils/compress-image';
 
-// POST /api/upload/image - Upload image to Supabase Storage with compression
 export async function POST(request: Request) {
   try {
-    const session = await getSession()
+    const session = await getSession();
 
     if (!session) {
       return NextResponse.json(
         { success: false, error: { code: 'UNAUTHORIZED', message: 'Tidak terautentikasi' } },
         { status: 401 }
-      )
+      );
     }
 
-    const supabase = createAdminClient()
-
-    // Parse form data
-    const formData = await request.formData()
-    const file = formData.get('file') as File | null
-    const folder = (formData.get('folder') as string) || 'soal-images'
-    const oldFilePath = formData.get('oldFilePath') as string | null
-    const maxSizeKB = parseInt(formData.get('maxSizeKB') as string) || 100
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const folder = (formData.get('folder') as string) || 'soal-images';
+    const oldFilePath = formData.get('oldFilePath') as string | null;
+    const maxSizeKB = parseInt(formData.get('maxSizeKB') as string) || 100;
 
     if (!file) {
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'File tidak ditemukan' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Validate file type
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       return NextResponse.json(
         { success: false, error: { code: 'INVALID_FILE_TYPE', message: 'File harus berupa gambar (JPEG, PNG, GIF, atau WebP)' } },
         { status: 400 }
-      )
+      );
     }
 
-    // Compress image if needed
-    let fileToUpload = file
-    let compressionMessage = ''
-    
+    let fileToUpload = file;
+    let compressionMessage = '';
+
     if (needsCompression(file, maxSizeKB)) {
-      const originalSize = file.size
-      fileToUpload = await compressImageToFile(file, file.name, {
-        maxSizeKB,
-        maxWidth: 1200,
-        maxHeight: 1200
-      })
-      compressionMessage = `Compressed from ${formatFileSize(originalSize)} to ${formatFileSize(fileToUpload.size)}`
-      console.log(compressionMessage)
-    }
-
-    // Generate unique filename
-    const fileExt = fileToUpload.name.split('.').pop()
-    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
-    const filePath = `${folder}/${fileName}`
-
-    // Convert file to ArrayBuffer
-    const arrayBuffer = await fileToUpload.arrayBuffer()
-    const buffer = Buffer.from(arrayBuffer)
-
-    // Upload to Supabase Storage
-    let { error: uploadError } = await supabase.storage
-      .from(folder)
-      .upload(filePath, buffer, {
-        contentType: fileToUpload.type,
-        upsert: false
-      })
-
-    if (uploadError && uploadError.message.includes('bucket') && uploadError.message.includes('not found')) {
-      const { error: createError } = await supabase.storage.createBucket(folder, {
-        public: true,
-        fileSizeLimit: 5242880
-      })
-
-      if (createError) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: {
-              code: 'BUCKET_NOT_FOUND',
-              message: `Bucket "${folder}" tidak dapat dibuat. Harap buat bucket di Supabase Storage dashboard.`
-            }
-          },
-          { status: 500 }
-        )
+      try {
+        const originalSize = file.size;
+        const compressedBuffer = await compressImage(await file.arrayBuffer(), maxSizeKB);
+        fileToUpload = new File([new Uint8Array(compressedBuffer)], file.name, { type: file.type });
+        compressionMessage = `Compressed from ${formatFileSize(originalSize)} to ${formatFileSize(fileToUpload.size)}`;
+      } catch (compressError) {
+        console.log('Compression skipped:', compressError);
       }
-
-      const uploadResult = await supabase.storage
-        .from(folder)
-        .upload(filePath, buffer, {
-          contentType: fileToUpload.type,
-          upsert: false
-        })
-
-      uploadError = uploadResult.error
     }
 
-    if (uploadError) {
-      console.error('Upload error:', uploadError)
-      
-      if (uploadError.message.includes('bucket') && uploadError.message.includes('not found')) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: { 
-              code: 'BUCKET_NOT_FOUND', 
-              message: `Bucket "${folder}" belum dibuat. Harap buat bucket di Supabase Storage terlebih dahulu.` 
-            } 
-          },
-          { status: 500 }
-        )
-      }
+    const fileExt = fileToUpload.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
-      return NextResponse.json(
-        { success: false, error: { code: 'UPLOAD_ERROR', message: uploadError.message } },
-        { status: 500 }
-      )
+    const uploadsDir = getUploadsDir();
+    const folderPath = path.join(uploadsDir, folder);
+
+    if (!existsSync(folderPath)) {
+      await mkdir(folderPath, { recursive: true });
     }
 
-    // Delete old file if provided
+    const filePath = path.join(folderPath, fileName);
+    const relativePath = `/uploads/${folder}/${fileName}`;
+
+    const arrayBuffer = await fileToUpload.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    await writeFile(filePath, buffer);
+
     if (oldFilePath) {
       try {
-        await supabase.storage
-          .from(folder)
-          .remove([oldFilePath])
-        console.log('Old file deleted:', oldFilePath)
+        const oldFullPath = path.join(uploadsDir, '..', oldFilePath.replace('/uploads/', ''));
+        if (existsSync(oldFullPath)) {
+          const { unlink } = await import('fs/promises');
+          await unlink(oldFullPath);
+          console.log('Old file deleted:', oldFilePath);
+        }
       } catch (deleteError) {
-        console.error('Failed to delete old file:', deleteError)
-        // Don't fail the upload if delete fails
+        console.error('Failed to delete old file:', deleteError);
       }
     }
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from(folder)
-      .getPublicUrl(filePath)
 
     return NextResponse.json({
       success: true,
       data: {
-        url: publicUrl,
+        url: relativePath,
         filename: fileName,
-        filePath: filePath,
+        filePath: relativePath,
         size: fileToUpload.size,
         compression: compressionMessage || 'No compression needed'
       }
-    })
+    });
 
   } catch (error) {
-    console.error('Image upload error:', error)
+    console.error('Image upload error:', error);
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
-    )
+    );
   }
+}
+
+async function compressImage(arrayBuffer: ArrayBuffer, maxSizeKB: number): Promise<Buffer> {
+  const sharp = await import('sharp').catch(() => null);
+  
+  if (sharp) {
+    const buffer = Buffer.from(arrayBuffer);
+    return await sharp.default(buffer)
+      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+  }
+
+  return Buffer.from(arrayBuffer);
 }

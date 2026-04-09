@@ -1,8 +1,8 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
+import { generateId, getTimestamp } from '@/lib/db/utils'
 import { NextResponse } from 'next/server'
 
-// GET /api/guru/soal - List soal with ujian_id filter
 export async function GET(request: Request) {
   try {
     const session = await getSession()
@@ -21,9 +21,9 @@ export async function GET(request: Request) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
 
-    // Parse query params
     const { searchParams } = new URL(request.url)
     const ujian_id = searchParams.get('ujian_id')
 
@@ -34,13 +34,7 @@ export async function GET(request: Request) {
       )
     }
 
-    // Verify user owns this ujian
-    const { data: ujian } = await supabase
-      .from('ujian')
-      .select('id, status')
-      .eq('id', ujian_id)
-      .eq('created_by', session.user.id)
-      .single()
+    const ujian = db.prepare('SELECT id, status FROM ujian WHERE id = ? AND created_by = ?').get(ujian_id, guruId) as { id: string; status: string } | undefined
 
     if (!ujian) {
       return NextResponse.json(
@@ -49,20 +43,11 @@ export async function GET(request: Request) {
       )
     }
 
-    // Get all soal for this ujian
-    const { data: soalList, error } = await supabase
-      .from('soal')
-      .select('*')
-      .eq('ujian_id', ujian_id)
-      .order('urutan', { ascending: true })
-
-    if (error) {
-      console.error('Error fetching soal:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
+    const soalList = db.prepare(`
+      SELECT * FROM soal
+      WHERE ujian_id = ?
+      ORDER BY urutan ASC
+    `).all(ujian_id) as any[]
 
     return NextResponse.json({
       success: true,
@@ -81,7 +66,6 @@ export async function GET(request: Request) {
   }
 }
 
-// POST /api/guru/soal - Create new soal
 export async function POST(request: Request) {
   try {
     const session = await getSession()
@@ -100,13 +84,12 @@ export async function POST(request: Request) {
       )
     }
 
-    const supabase = createAdminClient()
+    const db = getDb()
+    const guruId = session.user.id
 
-    // Parse request body
     const body = await request.json()
     const { ujian_id, teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan } = body
 
-    // Validation
     if (!ujian_id || !teks_soal || !jawaban_benar || !pengecoh_1 || !pengecoh_2) {
       return NextResponse.json(
         { success: false, error: { code: 'VALIDATION_ERROR', message: 'ujian_id, teks_soal, jawaban_benar, pengecoh_1, dan pengecoh_2 harus diisi' } },
@@ -114,13 +97,7 @@ export async function POST(request: Request) {
       )
     }
 
-    // Verify user owns this ujian
-    const { data: ujian } = await supabase
-      .from('ujian')
-      .select('id, status')
-      .eq('id', ujian_id)
-      .eq('created_by', session.user.id)
-      .single()
+    const ujian = db.prepare('SELECT id, status FROM ujian WHERE id = ? AND created_by = ?').get(ujian_id, guruId) as { id: string; status: string } | undefined
 
     if (!ujian) {
       return NextResponse.json(
@@ -129,53 +106,44 @@ export async function POST(request: Request) {
       )
     }
 
-    // Get next urutan if not provided
     let urutanSoal = urutan
     if (urutanSoal === undefined || urutanSoal === null) {
-      const { data: maxUrutan } = await supabase
-        .from('soal')
-        .select('urutan')
-        .eq('ujian_id', ujian_id)
-        .order('urutan', { ascending: false })
-        .limit(1)
-        .single()
+      const maxUrutan = db.prepare(`
+        SELECT urutan FROM soal
+        WHERE ujian_id = ?
+        ORDER BY urutan DESC
+        LIMIT 1
+      `).get(ujian_id) as { urutan: number } | undefined
       urutanSoal = maxUrutan ? maxUrutan.urutan + 1 : 0
     }
 
-    // Insert new soal
-    const { data: newSoal, error } = await supabase
-      .from('soal')
-      .insert({
-        ujian_id,
-        teks_soal,
-        gambar_url: gambar_url || null,
-        jawaban_benar,
-        pengecoh_1,
-        pengecoh_2,
-        pengecoh_3: pengecoh_3 || null,
-        pengecoh_4: pengecoh_4 || null,
-        urutan: urutanSoal
-      })
-      .select()
-      .single()
+    const id = generateId()
+    const now = getTimestamp()
 
-    if (error) {
-      console.error('Error creating soal:', error)
-      return NextResponse.json(
-        { success: false, error: { code: 'DATABASE_ERROR', message: error.message } },
-        { status: 500 }
-      )
-    }
+    db.prepare(`
+      INSERT INTO soal (id, ujian_id, teks_soal, gambar_url, jawaban_benar, pengecoh_1, pengecoh_2, pengecoh_3, pengecoh_4, urutan, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      ujian_id,
+      teks_soal,
+      gambar_url || null,
+      jawaban_benar,
+      pengecoh_1,
+      pengecoh_2,
+      pengecoh_3 || null,
+      pengecoh_4 || null,
+      urutanSoal,
+      now,
+      now
+    )
 
-    // Log audit
-    await supabase.from('audit_log').insert({
-      user_id: session.user.id,
-      role: 'guru',
-      action: 'create',
-      entity_type: 'soal',
-      entity_id: newSoal.id,
-      details: { ujian_id, teks_soal: teks_soal.substring(0, 50) }
-    })
+    const newSoal = db.prepare('SELECT * FROM soal WHERE id = ?').get(id) as any
+
+    db.prepare(`
+      INSERT INTO audit_log (id, user_id, role, action, entity_type, entity_id, details, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(generateId(), guruId, 'create', 'soal', id, JSON.stringify({ ujian_id, teks_soal: teks_soal.substring(0, 50) }), now)
 
     return NextResponse.json({
       success: true,

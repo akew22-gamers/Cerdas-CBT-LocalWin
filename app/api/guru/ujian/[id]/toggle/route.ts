@@ -1,8 +1,7 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getDb } from '@/lib/db/client'
 import { NextResponse } from 'next/server'
 
-// POST /api/guru/ujian/[id]/toggle - Toggle ujian status aktif/nonaktif
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -24,8 +23,7 @@ export async function POST(
       )
     }
 
-    const supabase = createAdminClient()
-
+    const db = getDb()
     const { id } = await params
     const body = await request.json()
 
@@ -36,38 +34,27 @@ export async function POST(
       )
     }
 
-    // Check if ujian exists and belongs to user
-    const { data: existingUjian, error: fetchError } = await supabase
-      .from('ujian')
-      .select('status')
-      .eq('id', id)
-      .eq('created_by', session.user.id)
-      .single()
+    const existingUjian = db.prepare(`
+      SELECT status FROM ujian WHERE id = ? AND created_by = ?
+    `).get(id, session.user.id) as any
 
-    if (fetchError || !existingUjian) {
+    if (!existingUjian) {
       return NextResponse.json(
         { success: false, error: { code: 'NOT_FOUND', message: 'Ujian tidak ditemukan' } },
         { status: 404 }
       )
     }
 
-    // Toggle status
     const newStatus = body.status
+    const now = new Date().toISOString().replace('T', ' ').substring(0, 19)
 
-    const { data: updatedUjian, error: updateError } = await supabase
-      .from('ujian')
-      .update({ status: newStatus })
-      .eq('id', id)
-      .select('id, kode_ujian, judul, status')
-      .single()
+    db.prepare(`
+      UPDATE ujian SET status = ?, updated_at = ? WHERE id = ?
+    `).run(newStatus, now, id)
 
-    if (updateError) {
-      console.error('Error toggling ujian status:', updateError)
-      return NextResponse.json(
-        { success: false, error: { code: 'SERVER_ERROR', message: 'Gagal mengubah status ujian' } },
-        { status: 500 }
-      )
-    }
+    const updatedUjian = db.prepare(`
+      SELECT id, kode_ujian, judul, status FROM ujian WHERE id = ?
+    `).get(id) as any
 
     return NextResponse.json({
       success: true,
