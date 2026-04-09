@@ -5,10 +5,10 @@ import * as XLSX from 'xlsx'
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ ujian_id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { ujian_id } = await params
+    const { id: ujian_id } = await params
     const { searchParams } = new URL(request.url)
     const format = searchParams.get('format') || 'xlsx'
 
@@ -114,7 +114,7 @@ export async function GET(
     )
 
   } catch (error: any) {
-    console.error('Error in GET /api/guru/hasil/[ujian_id]/export:', error)
+    console.error('Error in GET /api/guru/ujian/[id]/export:', error)
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }

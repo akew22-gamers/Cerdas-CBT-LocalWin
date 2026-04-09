@@ -4,10 +4,10 @@ import { NextResponse } from 'next/server'
 
 export async function GET(
   _request: Request,
-  { params }: { params: Promise<{ ujian_id: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { ujian_id } = await params
+    const { id: ujian_id } = await params
     const session = await getSession()
     if (!session) {
       return NextResponse.json(
@@ -89,7 +89,7 @@ export async function GET(
     })
 
   } catch (error: any) {
-    console.error('Error in GET /api/guru/hasil/[ujian_id]/stats:', error)
+    console.error('Error in GET /api/guru/ujian/[id]/stats:', error)
     return NextResponse.json(
       { success: false, error: { code: 'SERVER_ERROR', message: 'Terjadi kesalahan pada server' } },
       { status: 500 }
