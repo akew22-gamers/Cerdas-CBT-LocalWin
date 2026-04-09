@@ -46,36 +46,38 @@ const startServer = () => {
     return;
   }
 
+  // In development mode, Next.js dev server is already running from npm run electron:dev
+  if (isDev) {
+    console.log('Development mode: Next.js dev server already running on port', serverPort);
+    if (mainWindow) {
+      mainWindow.webContents.send('server-status', { running: true, port: serverPort, dataDir: getDataDir() });
+    }
+    return;
+  }
+
   const dataDir = getDataDir();
   
-  // Set environment variables for the Next.js server
   const env = {
     ...process.env,
     PORT: String(serverPort),
-    HOST: '0.0.0.0', // Allow LAN access
+    HOST: '0.0.0.0',
     DATA_DIR: dataDir,
-    NODE_ENV: isProduction ? 'production' : 'development',
+    NODE_ENV: 'production',
   };
 
   console.log('Starting server with DATA_DIR:', dataDir);
 
-  if (isProduction) {
-    const appPath = app.getAppPath();
-    const standalonePath = path.join(appPath, '.next', 'standalone');
-    const serverPath = path.join(standalonePath, 'server.js');
-    
-    console.log('Production server path:', serverPath);
-    console.log('App path:', appPath);
-    
-    serverProcess = spawn('node', [serverPath], { 
-      env,
-      cwd: standalonePath
-    });
-  } else {
-    const nextPath = path.join(__dirname, '..', 'node_modules', '.bin', 'next');
-    const projectPath = path.join(__dirname, '..');
-    serverProcess = spawn(nextPath, ['start'], { env, cwd: projectPath });
-  }
+  const appPath = app.getAppPath();
+  const standalonePath = path.join(appPath, '.next', 'standalone');
+  const serverPath = path.join(standalonePath, 'server.js');
+  
+  console.log('Production server path:', serverPath);
+  console.log('App path:', appPath);
+  
+  serverProcess = spawn('node', [serverPath], { 
+    env,
+    cwd: standalonePath
+  });
 
   serverProcess.stdout.on('data', (data) => {
     const output = data.toString();
@@ -111,6 +113,11 @@ const startServer = () => {
 
 // Stop Next.js server
 const stopServer = () => {
+  if (isDev) {
+    console.log('Development mode: Cannot stop Next.js dev server from Electron');
+    return;
+  }
+  
   if (!serverProcess) {
     console.log('Server not running');
     return;

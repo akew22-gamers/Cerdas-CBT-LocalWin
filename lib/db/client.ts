@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { runMigrations } from './migrations';
 
 const getDataDir = (): string => {
   const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
@@ -24,8 +25,13 @@ export const getDb = (): Database.Database => {
     db.pragma('foreign_keys = ON');
     db.pragma('synchronous = NORMAL');
     
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`[DB] Connected to SQLite at: ${dbPath}`);
+    console.log(`[DB] Connected to SQLite at: ${dbPath}`);
+    
+    // Run migrations on first connection
+    try {
+      runMigrations();
+    } catch (error) {
+      console.error('[DB] Migration error:', error);
     }
   }
   return db;
