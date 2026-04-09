@@ -6,26 +6,34 @@ export async function POST() {
   try {
     const db = getDb()
 
+    // Tables to delete in correct order (respecting foreign keys)
     const tablesToDelete = [
-      'siswa',
-      'guru',
-      'pelajaran',
-      'kelas',
-      'kelas_siswa',
-      'ujian',
-      'paket_soal',
-      'soal',
       'jawaban_siswa',
+      'anti_cheating_log',
       'hasil_ujian',
+      'soal',
+      'ujian_kelas',
+      'ujian',
+      'siswa',
+      'kelas',
+      'guru',
       'audit_log',
       'sessions'
     ]
 
     for (const table of tablesToDelete) {
-      db.prepare(`DELETE FROM ${table}`).run()
+      try {
+        db.prepare(`DELETE FROM ${table}`).run()
+      } catch (e) {
+        // Table might not exist, continue
+      }
     }
 
-    db.prepare('DELETE FROM identitas_sekolah').run()
+    try {
+      db.prepare('DELETE FROM identitas_sekolah').run()
+    } catch (e) {
+      // Table might not exist
+    }
 
     return NextResponse.json<ApiSuccessResponse<{ message: string }>>({
       success: true,
