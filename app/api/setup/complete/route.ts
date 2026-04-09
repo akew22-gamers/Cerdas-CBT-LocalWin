@@ -119,7 +119,6 @@ export async function POST(request: Request) {
         sekolah.logo_url || null,
         adminId,
         timestamp,
-        timestamp,
         timestamp
       )
 
