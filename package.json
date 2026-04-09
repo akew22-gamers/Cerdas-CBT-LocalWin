@@ -14,17 +14,26 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "electron:dev": "concurrently \"cross-env BROWSER=none next dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "next build && electron-builder",
-    "electron:build:win": "next build && electron-builder --win",
-    "electron:preview": "cross-env NODE_ENV=production electron ."
+    "electron:rebuild": "electron-rebuild -f -w better-sqlite3",
+    "electron:build": "npm run build && npm run electron:rebuild && electron-builder",
+    "electron:build:win": "npm run build && npm run electron:rebuild && electron-builder --win --x64",
+    "electron:build:linux": "npm run build && npm run electron:rebuild && electron-builder --linux --x64",
+    "electron:preview": "cross-env NODE_ENV=production electron .",
+    "postinstall": "electron-rebuild -f -w better-sqlite3"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/akew22-gamers/Cerdas-CBT-LocalWin.git"
   },
-  "keywords": ["cbt", "exam", "offline", "electron", "windows"],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "cbt",
+    "exam",
+    "offline",
+    "electron",
+    "windows"
+  ],
+  "author": "EAS Creative Studio",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/akew22-gamers/Cerdas-CBT-LocalWin/issues"
   },
@@ -32,30 +41,48 @@
   "build": {
     "appId": "com.cerdas.cbt-local",
     "productName": "CBT Server Local",
+    "copyright": "Copyright © 2024 EAS Creative Studio",
     "files": [
-      "dist/**/*",
-      ".next/**/*",
+      ".next/standalone/**/*",
+      ".next/static/**/*",
       "node_modules/**/*",
       "electron/**/*",
-      "data/**/*",
+      "public/**/*",
       "package.json"
     ],
     "directories": {
       "output": "release",
       "buildResources": "electron/resources"
     },
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         },
         {
           "target": "portable",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "icon": "electron/resources/icon.ico"
+      "icon": "electron/resources/icon.ico",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -65,7 +92,36 @@
       "installerHeaderIcon": "electron/resources/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "CBT Server Local"
+      "shortcutName": "CBT Server Local",
+      "license": "LICENSE",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-Portable-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "electron/resources/icons",
+      "category": "Education",
+      "maintainer": "eas.creative.studio@gmail.com",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "deb": {
+      "packageCategory": "education",
+      "priority": "optional"
     },
     "extraMetadata": {
       "main": "electron/main.js"
@@ -82,8 +138,6 @@
     "clsx": "^2.1.1",
     "concurrently": "^9.2.1",
     "cross-env": "^10.1.0",
-    "electron": "^41.2.0",
-    "electron-builder": "^26.8.1",
     "file-saver": "^2.0.5",
     "html5-qrcode": "^2.3.8",
     "jsonwebtoken": "^9.0.3",
@@ -107,6 +161,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.3",
     "@playwright/test": "^1.58.2",
     "@swc/jest": "^0.2.39",
     "@testing-library/jest-dom": "^6.9.1",
@@ -122,6 +177,8 @@
     "@types/react-dom": "^19.2.3",
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.4.27",
+    "electron": "^41.2.0",
+    "electron-builder": "^26.8.1",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.3.0",
     "jest-environment-jsdom": "^30.3.0",

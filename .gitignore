@@ -39,3 +39,7 @@ coverage/
 *.log
 *.tmp
 *.temptest-results/
+
+# Electron build output
+release/
+

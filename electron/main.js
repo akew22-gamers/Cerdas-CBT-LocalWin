@@ -60,11 +60,18 @@ const startServer = () => {
   console.log('Starting server with DATA_DIR:', dataDir);
 
   if (isProduction) {
-    // In production, use the bundled Next.js server
-    const serverPath = path.join(process.resourcesPath, 'server.js');
-    serverProcess = spawn('node', [serverPath], { env });
+    const appPath = app.getAppPath();
+    const standalonePath = path.join(appPath, '.next', 'standalone');
+    const serverPath = path.join(standalonePath, 'server.js');
+    
+    console.log('Production server path:', serverPath);
+    console.log('App path:', appPath);
+    
+    serverProcess = spawn('node', [serverPath], { 
+      env,
+      cwd: standalonePath
+    });
   } else {
-    // In development, use next start
     const nextPath = path.join(__dirname, '..', 'node_modules', '.bin', 'next');
     const projectPath = path.join(__dirname, '..');
     serverProcess = spawn(nextPath, ['start'], { env, cwd: projectPath });
