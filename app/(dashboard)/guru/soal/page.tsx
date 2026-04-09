@@ -1,5 +1,4 @@
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { SoalTable } from "@/components/soal/SoalTable"
@@ -28,7 +27,7 @@ interface Ujian {
   status: 'aktif' | 'nonaktif'
 }
 
-async function fetchData(searchParamsProps: { ujian_id?: string }): Promise<{
+async function fetchData(ujian_id: string | null): Promise<{
   soal: Soal[]
   ujian: Ujian[]
   selectedUjianId: string | null
@@ -45,57 +44,43 @@ async function fetchData(searchParamsProps: { ujian_id?: string }): Promise<{
     redirect("/login")
   }
 
-  const supabase = createAdminClient()
+  try {
+    const ujianRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/ujian`, { cache: 'no-store' })
+    const { data: ujianData } = await ujianRes.json()
+    const ujianList: Ujian[] = ujianData?.ujian || []
 
-  const { data: ujianList } = await supabase
-    .from("ujian")
-    .select("id, judul, kode_ujian, status")
-    .eq("created_by", session.user.id)
-    .order("created_at", { ascending: false })
+    let soal: Soal[] = []
+    let ujianStatus: 'aktif' | 'nonaktif' = 'nonaktif'
 
-  const selectedUjianId = searchParamsProps.ujian_id || null
-
-  let soal: Soal[] = []
-  let ujianStatus: 'aktif' | 'nonaktif' = 'nonaktif'
-
-  if (selectedUjianId) {
-    const [soalResult, ujianResult] = await Promise.all([
-      supabase
-        .from("soal")
-        .select("*")
-        .eq("ujian_id", selectedUjianId)
-        .order("urutan", { ascending: true }),
-      supabase
-        .from("ujian")
-        .select("status")
-        .eq("id", selectedUjianId)
-        .eq("created_by", session.user.id)
-        .single()
-    ])
-
-    const { data: soalData, error } = soalResult
-    if (!error && soalData) {
-      soal = soalData
+    if (ujian_id) {
+      const soalRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/soal?ujian_id=${ujian_id}`, { cache: 'no-store' })
+      const { data: soalData } = await soalRes.json()
+      soal = soalData?.soal || []
+      ujianStatus = (soalData?.ujian_status as 'aktif' | 'nonaktif') || 'nonaktif'
     }
 
-    const { data: ujianData } = ujianResult
-    if (ujianData) {
-      ujianStatus = ujianData.status
+    return {
+      soal,
+      ujian: ujianList,
+      selectedUjianId: ujian_id,
+      ujianStatus,
+      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
     }
-  }
-
-  return {
-    soal,
-    ujian: ujianList || [],
-    selectedUjianId,
-    ujianStatus,
-    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
+  } catch {
+    return {
+      soal: [],
+      ujian: [],
+      selectedUjianId: ujian_id,
+      ujianStatus: 'nonaktif',
+      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
+    }
   }
 }
 
 export default async function SoalListPage({ searchParams }: { searchParams: Promise<{ ujian_id?: string }> }) {
   const resolvedSearchParams = await searchParams
-  const { soal, ujian, selectedUjianId, ujianStatus, user } = await fetchData(resolvedSearchParams)
+  const selectedUjianId = resolvedSearchParams.ujian_id || null
+  const { soal, ujian, selectedUjianId: selectedId, ujianStatus, user } = await fetchData(selectedUjianId)
 
   return (
     <DashboardLayout user={user}>
@@ -114,7 +99,7 @@ export default async function SoalListPage({ searchParams }: { searchParams: Pro
             <div className="flex gap-2">
               <SoalActions 
                 selectedUjianId={selectedUjianId} 
-                ujianStatus={ujianStatus} 
+                ujianStatus={ujianStatus as 'aktif' | 'nonaktif'} 
               />
             </div>
             {!selectedUjianId && (
@@ -150,7 +135,7 @@ export default async function SoalListPage({ searchParams }: { searchParams: Pro
                 <div className="flex items-center gap-4">
                   <UjianStatusToggle 
                     ujianId={selectedUjianId} 
-                    currentStatus={ujianStatus} 
+                    currentStatus={ujianStatus as 'aktif' | 'nonaktif'} 
                   />
                   {ujianStatus === 'aktif' && (
                     <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
@@ -165,7 +150,7 @@ export default async function SoalListPage({ searchParams }: { searchParams: Pro
             </div>
             <SoalTable
               data={soal}
-              ujianStatus={ujianStatus}
+              ujianStatus={ujianStatus as 'aktif' | 'nonaktif'}
             />
           </div>
         )}

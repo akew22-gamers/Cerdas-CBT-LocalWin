@@ -1,8 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 export interface HasilUjianData {
   id: string
@@ -16,10 +14,12 @@ export interface HasilUjianData {
 
 export function useHasilUjianRealtime({
   ujianIds,
-  onNewResultAction
+  onNewResultAction,
+  pollingInterval = 5000
 }: {
   ujianIds: string[]
   onNewResultAction?: (hasil: HasilUjianData) => void
+  pollingInterval?: number
 }): {
   newResults: HasilUjianData[]
   subscribe: () => void
@@ -28,48 +28,56 @@ export function useHasilUjianRealtime({
 } {
   const [newResults, setNewResults] = useState<HasilUjianData[]>([])
   const [isSubscribed, setIsSubscribed] = useState(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const seenResultsRef = useRef<Set<string>>(new Set())
 
-  const handleNewResult = useCallback((payload: RealtimePostgresChangesPayload<HasilUjianData>) => {
-    if (!payload.new || typeof payload.new !== 'object' || !('ujian_id' in payload.new)) return
-    const newHasil = payload.new as HasilUjianData
-    
-    if (ujianIds.includes(newHasil.ujian_id)) {
-      setNewResults((prev) => [...prev, newHasil])
-      onNewResultAction?.(newHasil)
+  const fetchResults = useCallback(async () => {
+    if (ujianIds.length === 0) return
+
+    try {
+      const res = await fetch('/api/guru/hasil')
+      if (!res.ok) {
+        console.error('Failed to fetch hasil ujian')
+        return
+      }
+
+      const result = await res.json()
+      
+      if (!result.success) return
+
+      const results: HasilUjianData[] = result.data?.hasils || result.data || []
+      
+      const filteredResults = results.filter(
+        (r: HasilUjianData) => ujianIds.includes(r.ujian_id)
+      )
+
+      filteredResults.forEach((hasil: HasilUjianData) => {
+        if (!seenResultsRef.current.has(hasil.id)) {
+          seenResultsRef.current.add(hasil.id)
+          setNewResults((prev) => [...prev, hasil])
+          onNewResultAction?.(hasil)
+        }
+      })
+    } catch (error) {
+      console.error('Error polling hasil ujian:', error)
     }
   }, [ujianIds, onNewResultAction])
 
   const subscribe = useCallback(() => {
     if (isSubscribed || ujianIds.length === 0) return
 
-    const supabase = createClient()
-    const channelName = `hasil_ujian_${ujianIds.join('_')}_${Date.now()}`
-    const channel = supabase.channel(channelName)
-
-    channel.on(
-      'postgres_changes',
-      {
-        event: '*',
-        schema: 'public',
-        table: 'hasil_ujian'
-      },
-      handleNewResult
-    )
-
-    channel.subscribe()
+    fetchResults()
+    
+    intervalRef.current = setInterval(fetchResults, pollingInterval)
     setIsSubscribed(true)
-
-    ;(window as any)._hasilUjianChannel = channel
-  }, [isSubscribed, ujianIds, handleNewResult])
+  }, [isSubscribed, ujianIds, fetchResults, pollingInterval])
 
   const unsubscribe = useCallback(() => {
-    const channel = (window as any)._hasilUjianChannel
-    if (channel) {
-      const supabase = createClient()
-      supabase.removeChannel(channel)
-      ;(window as any)._hasilUjianChannel = null
-      setIsSubscribed(false)
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
     }
+    setIsSubscribed(false)
   }, [])
 
   useEffect(() => {
@@ -77,6 +85,16 @@ export function useHasilUjianRealtime({
       unsubscribe()
     }
   }, [unsubscribe])
+
+  useEffect(() => {
+    if (!isSubscribed && ujianIds.length > 0) {
+      subscribe()
+    }
+    
+    if (isSubscribed && ujianIds.length === 0) {
+      unsubscribe()
+    }
+  }, [ujianIds, isSubscribed, subscribe, unsubscribe])
 
   return {
     newResults,

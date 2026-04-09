@@ -1,5 +1,4 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SiswaClient } from '@/components/siswa/SiswaClient'
@@ -19,14 +18,8 @@ interface Siswa {
   } | null
 }
 
-export default async function SiswaListPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ kelas_id?: string }>
-}) {
+async function getSiswaData(kelas_id?: string) {
   const session = await getSession()
-  const resolvedParams = await searchParams
-  const kelas_id = resolvedParams.kelas_id
 
   if (!session) {
     redirect('/login')
@@ -36,30 +29,35 @@ export default async function SiswaListPage({
     redirect('/login')
   }
 
-  const supabase = createAdminClient()
+  try {
+    const kelasRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/kelas`, { cache: 'no-store' })
+    const { data: kelasData } = await kelasRes.json()
+    const kelasList: Kelas[] = (kelasData?.kelas || []).map((k: any) => ({
+      id: k.id,
+      nama_kelas: k.nama_kelas
+    }))
 
-  const { data: kelasList } = await supabase
-    .from('kelas')
-    .select('id, nama_kelas')
-    .eq('created_by', session.user.id)
-    .order('nama_kelas', { ascending: true })
+    const params = new URLSearchParams()
+    if (kelas_id) params.set('kelas_id', kelas_id)
+    
+    const siswaRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/siswa?${params.toString()}`, { cache: 'no-store' })
+    const { data: siswaResult } = await siswaRes.json()
+    const siswaList: Siswa[] = siswaResult?.siswa || []
 
-  let query = supabase
-    .from('siswa')
-    .select(`
-      *,
-      kelas:kelas_id (
-        id,
-        nama_kelas
-      )
-    `)
-    .eq('created_by', session.user.id)
-
-  if (kelas_id) {
-    query = query.eq('kelas_id', kelas_id)
+    return { kelasList, siswaList, session }
+  } catch {
+    return { kelasList: [], siswaList: [], session }
   }
+}
 
-  const { data: siswaList } = await query.order('nama', { ascending: true })
+export default async function SiswaListPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ kelas_id?: string }>
+}) {
+  const resolvedParams = await searchParams
+  const kelas_id = resolvedParams.kelas_id
+  const { kelasList, siswaList, session } = await getSiswaData(kelas_id)
 
   return (
     <DashboardLayout

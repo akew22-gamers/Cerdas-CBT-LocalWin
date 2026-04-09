@@ -1,5 +1,4 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SiswaForm } from '@/components/siswa/SiswaForm'
@@ -9,9 +8,8 @@ interface EditSiswaPageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function EditSiswaPage({ params }: EditSiswaPageProps) {
+async function getSiswaData(id: string) {
   const session = await getSession()
-  const { id } = await params
 
   if (!session) {
     redirect('/login')
@@ -21,30 +19,33 @@ export default async function EditSiswaPage({ params }: EditSiswaPageProps) {
     redirect('/login')
   }
 
-  const supabase = createAdminClient()
+  try {
+    const siswaRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/siswa/${id}`, { cache: 'no-store' })
+    const { data: siswaResult } = await siswaRes.json()
+    
+    if (!siswaResult?.siswa) {
+      notFound()
+    }
+    
+    const siswaData = siswaResult.siswa
 
-  const { data: siswaData } = await supabase
-    .from('siswa')
-    .select(`
-      *,
-      kelas:kelas_id (
-        id,
-        nama_kelas
-      )
-    `)
-    .eq('id', id)
-    .eq('created_by', session.user.id)
-    .single()
+    const kelasRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/kelas`, { cache: 'no-store' })
+    const { data: kelasData } = await kelasRes.json()
+    const kelasList = kelasData?.kelas || []
+
+    return { siswaData, kelasList, session }
+  } catch {
+    notFound()
+  }
+}
+
+export default async function EditSiswaPage({ params }: EditSiswaPageProps) {
+  const { id } = await params
+  const { siswaData, kelasList, session } = await getSiswaData(id)
 
   if (!siswaData) {
     notFound()
   }
-
-  const { data: kelasList } = await supabase
-    .from('kelas')
-    .select('id, nama_kelas')
-    .eq('created_by', session.user.id)
-    .order('nama_kelas', { ascending: true })
 
   return (
     <DashboardLayout

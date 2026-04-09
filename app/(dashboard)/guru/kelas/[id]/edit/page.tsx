@@ -1,5 +1,4 @@
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { KelasForm } from "@/components/kelas/KelasForm"
@@ -20,22 +19,20 @@ async function getKelasData(id: string) {
     redirect("/login")
   }
 
-  const supabase = createAdminClient()
-
-  const { data: kelas, error } = await supabase
-    .from("kelas")
-    .select("id, nama_kelas")
-    .eq("id", id)
-    .eq("created_by", session.user.id)
-    .single()
-
-  if (error || !kelas) {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/kelas/${id}`, { cache: 'no-store' })
+    const { data } = await res.json()
+    
+    if (!data?.kelas) {
+      redirect("/guru/kelas")
+    }
+    
+    return {
+      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
+      kelas: data.kelas,
+    }
+  } catch {
     redirect("/guru/kelas")
-  }
-
-  return {
-    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
-    kelas,
   }
 }
 

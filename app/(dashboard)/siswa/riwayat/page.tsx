@@ -1,40 +1,37 @@
 import { redirect } from "next/navigation"
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { DashboardLayout } from "@/components/layout"
 import { Card, CardContent } from "@/components/ui/card"
 import { RiwayatCard } from "@/components/siswa/RiwayatCard"
 import { History, AlertCircle } from "lucide-react"
 
-async function getRiwayatUjian(siswaId: string) {
-  const supabase = createAdminClient()
+async function getRiwayatUjian() {
+  const session = await getSession()
+  
+  if (!session) {
+    redirect("/login")
+  }
+  
+  if (session.user.role !== "siswa") {
+    redirect("/login")
+  }
 
-  const { data: hasilData } = await supabase
-    .from('hasil_ujian')
-    .select(`
-      id,
-      nilai,
-      waktu_selesai,
-      is_submitted,
-      ujian:ujian_id (
-        id,
-        judul,
-        show_result
-      )
-    `)
-    .eq('siswa_id', siswaId)
-    .eq('is_submitted', true)
-    .order('waktu_selesai', { ascending: false })
-
-  return (hasilData || []).map((h: any) => ({
-    id: h.id,
-    ujian_id: h.ujian?.id,
-    ujian_judul: h.ujian?.judul || '-',
-    show_result: h.ujian?.show_result ?? false,
-    nilai: h.nilai,
-    completed_at: h.waktu_selesai,
-    is_submitted: h.is_submitted
-  }))
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/siswa/dashboard`, { cache: 'no-store' })
+    const { data } = await res.json()
+    
+    return (data?.recent_hasil || []).map((h: any) => ({
+      id: h.id,
+      ujian_id: h.ujian_id,
+      ujian_judul: h.ujian_judul || '-',
+      show_result: h.show_result,
+      nilai: h.nilai,
+      completed_at: h.completed_at,
+      is_submitted: h.is_submitted
+    }))
+  } catch {
+    return []
+  }
 }
 
 export default async function SiswaRiwayatPage() {
@@ -48,7 +45,7 @@ export default async function SiswaRiwayatPage() {
     redirect("/login")
   }
 
-  const riwayatList = await getRiwayatUjian(session.user.id)
+  const riwayatList = await getRiwayatUjian()
 
   const user = {
     nama: session.user.nama || "Siswa",
@@ -69,20 +66,28 @@ export default async function SiswaRiwayatPage() {
           </div>
         </div>
 
-        {riwayatList.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {riwayatList.map((hasil) => (
-              <RiwayatCard
-                key={hasil.id}
-                id={hasil.id}
-                ujian_judul={hasil.ujian_judul}
-                nilai={hasil.nilai}
-                show_result={hasil.show_result}
-                completed_at={hasil.completed_at}
-              />
-            ))}
-          </div>
-        ) : (
+          {riwayatList.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {riwayatList.map((hasil: {
+                id: string
+                ujian_id: string
+                ujian_judul: string
+                show_result: boolean
+                nilai: number
+                completed_at: string | null
+                is_submitted: boolean
+              }) => (
+                <RiwayatCard
+                  key={hasil.id}
+                  id={hasil.id}
+                  ujian_judul={hasil.ujian_judul}
+                  nilai={hasil.nilai}
+                  show_result={hasil.show_result}
+                  completed_at={hasil.completed_at}
+                />
+              ))}
+            </div>
+          ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16 text-center">
               <AlertCircle className="w-16 h-16 text-gray-300 mb-4" />

@@ -1,9 +1,8 @@
-import { getDb } from '@/lib/db/client';
 import { getSetupStatus } from '@/lib/db';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { 
+import {
   Monitor, 
   Shield, 
   Clock, 
@@ -20,7 +19,7 @@ import {
 } from 'lucide-react'
 import { AnimatedSection, AnimatedCard } from '@/components/landing/AnimatedSection'
 
-async function getSetupStatus() {
+async function checkSetupStatus() {
   try {
     const status = getSetupStatus();
     return { isSetupComplete: status.hasSuperAdmin && status.hasSchool };
@@ -76,17 +75,17 @@ const advantages = [
   {
     icon: Lock,
     title: 'Aman & Terpercaya',
-    description: 'Menggunakan Supabase dengan enkripsi data dan autentikasi yang aman.'
+    description: 'Enkripsi password dan sistem audit logging untuk keamanan penuh.'
   },
   {
     icon: Database,
-    title: 'Cloud-Based',
-    description: 'Data tersimpan di cloud, dapat diakses kapan saja dan dari mana saja.'
+    title: 'SQLite-Based',
+    description: 'Data tersimpan di SQLite database lokal, dapat berjalan tanpa koneksi internet.'
   }
 ]
 
 export default async function LandingPage() {
-  const setupStatus = await getSetupStatus()
+  const setupStatus = await checkSetupStatus()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20">
@@ -151,6 +150,7 @@ export default async function LandingPage() {
               <p className="text-lg sm:text-xl text-slate-600 max-w-3xl mx-auto mb-10">
                 Platform ujian online yang aman, cepat, dan mudah digunakan untuk membantu sekolah
                 melaksanakan ujian berbasis komputer dengan fitur anti-cheating dan analisis hasil yang lengkap.
+                Berbasis SQLite untuk performa optimal tanpa memerlukan koneksi internet.
               </p>
             </AnimatedSection>
 
@@ -257,7 +257,8 @@ export default async function LandingPage() {
                 <p className="text-blue-100 text-lg mb-8">
                   Cerdas-CBT dikembangkan oleh EAS Creative Studio untuk membantu sekolah dalam melaksanakan 
                   ujian berbasis komputer dengan aman, efisien, dan modern. Platform ini dirancang 
-                  menggunakan teknologi terkini dengan fokus pada kemudahan penggunaan dan keamanan data.
+                  menggunakan teknologi terkini dengan database SQLite untuk performa optimal tanpa memerlukan koneksi internet, 
+                  fokus pada kemudahan penggunaan dan keamanan data.
                 </p>
                 
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 transition-all duration-300 hover:bg-white/15">

@@ -1,4 +1,5 @@
-import { createClient } from '@/lib/supabase/server'
+import { getDb } from '@/lib/db/client'
+import { getSession } from '@/lib/auth/session'
 import { headers } from 'next/headers'
 
 export type AuditAction =
@@ -45,19 +46,23 @@ export async function logAudit({
   ipAddress
 }: AuditLogInput): Promise<void> {
   try {
-    const supabase = await createClient()
     const headersList = await headers()
     const clientIp = ipAddress || headersList.get('x-forwarded-for')?.split(',')[0] || headersList.get('x-real-ip') || null
 
-    await supabase.from('audit_log').insert({
-      user_id: userId,
+    const db = getDb()
+    
+    db.prepare(`
+      INSERT INTO audit_log (user_id, role, action, entity_type, entity_id, details, ip_address, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    `).run(
+      userId,
       role,
       action,
-      entity_type: entityType || null,
-      entity_id: entityId || null,
-      details: details || null,
-      ip_address: clientIp
-    })
+      entityType || null,
+      entityId || null,
+      details ? JSON.stringify(details) : null,
+      clientIp
+    )
   } catch {
     console.error('Failed to log audit event')
   }
@@ -68,44 +73,16 @@ export async function getCurrentUserForAudit(): Promise<{
   role: 'super_admin' | 'guru' | 'siswa'
 } | null> {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const session = await getSession()
 
-    if (!user) {
+    if (!session) {
       return null
     }
 
-    const { data: superAdmin } = await supabase
-      .from('super_admin')
-      .select('id')
-      .eq('id', user.id)
-      .single()
-
-    if (superAdmin) {
-      return { userId: user.id, role: 'super_admin' }
+    return { 
+      userId: session.user.id, 
+      role: session.user.role 
     }
-
-    const { data: guru } = await supabase
-      .from('guru')
-      .select('id')
-      .eq('id', user.id)
-      .single()
-
-    if (guru) {
-      return { userId: user.id, role: 'guru' }
-    }
-
-    const { data: siswa } = await supabase
-      .from('siswa')
-      .select('id')
-      .eq('id', user.id)
-      .single()
-
-    if (siswa) {
-      return { userId: user.id, role: 'siswa' }
-    }
-
-    return null
   } catch (error) {
     console.error('Error getting current user for audit')
     return null

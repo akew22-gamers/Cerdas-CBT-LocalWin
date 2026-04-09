@@ -1,14 +1,12 @@
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { UjianForm } from "@/components/ujian/UjianForm"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { FileText } from "lucide-react"
 
-export default async function EditUjianPage({ params }: { params: Promise<{ id: string }> }) {
+async function getUjianData(id: string) {
   const session = await getSession()
-  const { id } = await params
 
   if (!session) {
     redirect("/login")
@@ -18,18 +16,23 @@ export default async function EditUjianPage({ params }: { params: Promise<{ id: 
     redirect("/login")
   }
 
-  const supabase = createAdminClient()
-
-  const { data: ujian, error } = await supabase
-    .from("ujian")
-    .select("id, kode_ujian, judul, durasi, jumlah_opsi, show_result, status")
-    .eq("id", id)
-    .eq("created_by", session.user.id)
-    .single()
-
-  if (error || !ujian) {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/ujian/${id}`, { cache: 'no-store' })
+    const { data } = await res.json()
+    
+    if (!data?.ujian) {
+      redirect("/guru/ujian")
+    }
+    
+    return { ujian: data.ujian, session }
+  } catch {
     redirect("/guru/ujian")
   }
+}
+
+export default async function EditUjianPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const { ujian, session } = await getUjianData(id)
 
   return (
     <DashboardLayout user={{ nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }}>

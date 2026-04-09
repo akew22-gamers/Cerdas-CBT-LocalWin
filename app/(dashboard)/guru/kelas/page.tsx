@@ -1,5 +1,4 @@
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { KelasTable } from "@/components/kelas/KelasTable"
@@ -23,37 +22,26 @@ async function getKelasList(): Promise<{ kelas: Kelas[]; user: { nama: string; u
     redirect("/login")
   }
 
-  const supabase = createAdminClient()
-
-  const { data: kelasList, error } = await supabase
-    .from("kelas")
-    .select(`
-      id,
-      nama_kelas,
-      created_at,
-      siswa_count:siswa(count)
-    `)
-    .eq("created_by", session.user.id)
-    .order("nama_kelas", { ascending: true })
-
-  if (error) {
-    console.error("Error fetching kelas:", error)
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/kelas`, { cache: 'no-store' })
+    const { data } = await res.json()
+    
+    const formattedKelas: Kelas[] = (data?.kelas || []).map((k: any) => ({
+      id: k.id,
+      nama_kelas: k.nama_kelas,
+      created_at: k.created_at,
+      jumlah_siswa: k.jumlah_siswa || 0,
+    }))
+    
+    return {
+      kelas: formattedKelas,
+      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
+    }
+  } catch {
     return {
       kelas: [],
-      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
+      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
     }
-  }
-
-  const formattedKelas: Kelas[] = kelasList.map((k: any) => ({
-    id: k.id,
-    nama_kelas: k.nama_kelas,
-    created_at: k.created_at,
-    jumlah_siswa: k.siswa_count?.[0]?.count || 0,
-  }))
-
-  return {
-    kelas: formattedKelas,
-    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" },
   }
 }
 

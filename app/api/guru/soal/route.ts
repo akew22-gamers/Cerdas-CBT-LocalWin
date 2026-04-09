@@ -26,6 +26,10 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const ujian_id = searchParams.get('ujian_id')
+    const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const offset = (page - 1) * limit
 
     if (!ujian_id) {
       return NextResponse.json(
@@ -43,17 +47,43 @@ export async function GET(request: Request) {
       )
     }
 
-    const soalList = db.prepare(`
+    let whereClause = 'WHERE ujian_id = ?'
+    const params: any[] = [ujian_id]
+
+    if (search) {
+      whereClause += ' AND LOWER(teks_soal) LIKE ?'
+      const searchTerm = `%${search.toLowerCase()}%`
+      params.push(searchTerm)
+    }
+
+    const countSql = `
+      SELECT COUNT(*) as count
+      FROM soal
+      ${whereClause}
+    `
+    const countResult = db.prepare(countSql).get(...params) as { count: number }
+    const total = countResult.count
+
+    const dataSql = `
       SELECT * FROM soal
-      WHERE ujian_id = ?
+      ${whereClause}
       ORDER BY urutan ASC
-    `).all(ujian_id) as any[]
+      LIMIT ? OFFSET ?
+    `
+    const dataParams = [...params, limit, offset]
+    const soalList = db.prepare(dataSql).all(...dataParams) as any[]
 
     return NextResponse.json({
       success: true,
       data: {
         soal: soalList || [],
-        ujian_status: ujian.status
+        ujian_status: ujian.status,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
       }
     })
 

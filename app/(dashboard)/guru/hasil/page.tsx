@@ -1,9 +1,8 @@
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { HasilClient } from "@/components/hasil/HasilClient"
 
-export default async function HasilListPage() {
+async function getUjianList() {
   const session = await getSession()
 
   if (!session) {
@@ -14,13 +13,23 @@ export default async function HasilListPage() {
     redirect("/login")
   }
 
-  const supabase = createAdminClient()
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/ujian`, { cache: 'no-store' })
+    const { data } = await res.json()
+    return { 
+      ujianList: data?.ujian || [], 
+      session 
+    }
+  } catch {
+    return { 
+      ujianList: [], 
+      session 
+    }
+  }
+}
 
-  const { data: ujianList } = await supabase
-    .from("ujian")
-    .select("id, judul, kode_ujian, status")
-    .eq("created_by", session.user.id)
-    .order("created_at", { ascending: false })
+export default async function HasilListPage() {
+  const { ujianList, session } = await getUjianList()
 
   const user = {
     nama: session.user.nama || "Guru",

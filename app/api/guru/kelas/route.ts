@@ -3,7 +3,7 @@ import { getDb } from '@/lib/db/client'
 import { generateId, getTimestamp } from '@/lib/db/utils'
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await getSession()
 
@@ -24,13 +24,39 @@ export async function GET() {
     const db = getDb()
     const guruId = session.user.id
 
-    const kelasRows = db.prepare(`
+    const { searchParams } = new URL(request.url)
+    const search = searchParams.get('search') || ''
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const offset = (page - 1) * limit
+
+    let whereClause = 'WHERE k.created_by = ?'
+    const params: any[] = [guruId]
+
+    if (search) {
+      whereClause += ' AND LOWER(k.nama_kelas) LIKE ?'
+      const searchTerm = `%${search.toLowerCase()}%`
+      params.push(searchTerm)
+    }
+
+    const countSql = `
+      SELECT COUNT(*) as count
+      FROM kelas k
+      ${whereClause}
+    `
+    const countResult = db.prepare(countSql).get(...params) as { count: number }
+    const total = countResult.count
+
+    const dataSql = `
       SELECT k.id, k.nama_kelas, k.created_at,
         (SELECT COUNT(*) FROM siswa s WHERE s.kelas_id = k.id) as jumlah_siswa
       FROM kelas k
-      WHERE k.created_by = ?
+      ${whereClause}
       ORDER BY k.nama_kelas ASC
-    `).all(guruId) as any[]
+      LIMIT ? OFFSET ?
+    `
+    const dataParams = [...params, limit, offset]
+    const kelasRows = db.prepare(dataSql).all(...dataParams) as any[]
 
     const formattedKelas = kelasRows.map((k) => ({
       id: k.id,
@@ -42,7 +68,13 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       data: {
-        kelas: formattedKelas
+        kelas: formattedKelas,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
       }
     })
 

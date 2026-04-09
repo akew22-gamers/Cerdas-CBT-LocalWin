@@ -1,5 +1,4 @@
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { KelasForm } from "@/components/kelas/KelasForm"

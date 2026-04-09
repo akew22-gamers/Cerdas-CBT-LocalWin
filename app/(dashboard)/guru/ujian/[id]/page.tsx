@@ -1,5 +1,4 @@
 import { getSession } from "@/lib/auth/session"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 import { DashboardLayout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
@@ -30,61 +29,29 @@ async function getUjianDetail(id: string) {
     return null
   }
 
-  const supabase = createAdminClient()
-
-  const { data: ujian } = await supabase
-    .from("ujian")
-    .select(`
-      id,
-      kode_ujian,
-      judul,
-      durasi,
-      jumlah_opsi,
-      status,
-      show_result,
-      created_at,
-      ujian_kelas(kelas_id, kelas(id, nama_kelas)),
-      soal_count:soal(count)
-    `)
-    .eq("id", id)
-    .eq("created_by", session.user.id)
-    .single()
-
-  if (!ujian) {
-    return null
-  }
-
-  const kelasMap = new Map()
-  ujian.ujian_kelas?.forEach((uk: any) => {
-    if (uk.kelas) {
-      kelasMap.set(uk.kelas_id, {
-        id: uk.kelas.id,
-        nama_kelas: uk.kelas.nama_kelas
-      })
+  try {
+    const ujianRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/ujian/${id}`, { cache: 'no-store' })
+    const { data: ujianData } = await ujianRes.json()
+    
+    if (!ujianData) {
+      return null
     }
-  })
 
-  const { data: soalList } = await supabase
-    .from("soal")
-    .select("id, teks_soal, urutan")
-    .eq("ujian_id", id)
-    .order("urutan", { ascending: true })
+    const soalRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/soal?ujian_id=${id}`, { cache: 'no-store' })
+    const { data: soalData } = await soalRes.json()
+    const soal = (soalData?.soal || []).map((s: any) => ({
+      id: s.id,
+      teks_soal: s.teks_soal,
+      urutan: s.urutan
+    }))
 
-  return {
-    ujian: {
-      id: ujian.id,
-      kode_ujian: ujian.kode_ujian,
-      judul: ujian.judul,
-      durasi: ujian.durasi,
-      jumlah_opsi: ujian.jumlah_opsi,
-      status: ujian.status,
-      show_result: ujian.show_result,
-      created_at: ujian.created_at,
-      kelas: Array.from(kelasMap.values()),
-      jumlah_soal: ujian.soal_count?.[0]?.count || 0
-    },
-    soal: soalList || [],
-    user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
+    return {
+      ujian: ujianData,
+      soal,
+      user: { nama: session.user.nama || "Guru", username: session.user.username, role: "guru" }
+    }
+  } catch {
+    return null
   }
 }
 
@@ -209,23 +176,23 @@ export default async function UjianDetailPage({ params }: { params: Promise<{ id
 
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <h2 className="text-lg font-semibold mb-4">Kelas yang Ditugaskan</h2>
-            {ujian.kelas.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-sm text-gray-500 mb-3">Belum ada kelas yang ditugaskan</p>
-                <AssignKelasDialog ujianId={ujian.id} onAssignSuccess={() => {}} />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {ujian.kelas.map((k) => (
-                  <div key={k.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <span className="text-sm font-medium">{k.nama_kelas}</span>
+                {ujian.kelas.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-sm text-gray-500 mb-3">Belum ada kelas yang ditugaskan</p>
+                    <AssignKelasDialog ujianId={ujian.id} onAssignSuccess={() => {}} />
                   </div>
-                ))}
-                <div className="pt-3">
-                  <AssignKelasDialog ujianId={ujian.id} onAssignSuccess={() => {}} />
-                </div>
-              </div>
-            )}
+                ) : (
+                  <div className="space-y-2">
+                    {ujian.kelas.map((k: { id: string; nama_kelas: string }) => (
+                      <div key={k.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                        <span className="text-sm font-medium">{k.nama_kelas}</span>
+                      </div>
+                    ))}
+                    <div className="pt-3">
+                      <AssignKelasDialog ujianId={ujian.id} onAssignSuccess={() => {}} />
+                    </div>
+                  </div>
+                )}
           </div>
         </div>
 
@@ -243,7 +210,7 @@ export default async function UjianDetailPage({ params }: { params: Promise<{ id
             </div>
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
-              {soal.map((s, index) => (
+              {soal.map((s: { id: string; teks_soal: string; urutan: number }, index: number) => (
                 <div key={s.id} className="flex items-start gap-3 py-2 border-b last:border-0">
                   <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gray-100 rounded text-xs font-medium">
                     {index + 1}

@@ -1,11 +1,10 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SiswaForm } from '@/components/siswa/SiswaForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
-export default async function CreateSiswaPage() {
+async function getKelasList() {
   const session = await getSession()
 
   if (!session) {
@@ -16,13 +15,17 @@ export default async function CreateSiswaPage() {
     redirect('/login')
   }
 
-  const supabase = createAdminClient()
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/kelas`, { cache: 'no-store' })
+    const { data } = await res.json()
+    return { kelasList: data?.kelas || [], session }
+  } catch {
+    return { kelasList: [], session }
+  }
+}
 
-  const { data: kelasList } = await supabase
-    .from('kelas')
-    .select('id, nama_kelas')
-    .eq('created_by', session.user.id)
-    .order('nama_kelas', { ascending: true })
+export default async function CreateSiswaPage() {
+  const { kelasList, session } = await getKelasList()
 
   return (
     <DashboardLayout

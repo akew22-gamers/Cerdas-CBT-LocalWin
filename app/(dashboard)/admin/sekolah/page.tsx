@@ -1,12 +1,11 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { DashboardLayout } from '@/components/layout'
 import { SekolahDisplay } from '@/components/sekolah/SekolahDisplay'
 import { Badge } from '@/components/ui/badge'
 import { School } from 'lucide-react'
 
-export default async function AdminSekolahPage() {
+async function getSekolahData() {
   const session = await getSession()
 
   if (!session) {
@@ -17,16 +16,17 @@ export default async function AdminSekolahPage() {
     redirect('/login')
   }
 
-  const supabase = createAdminClient()
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/admin/sekolah`, { cache: 'no-store' })
+    const { data } = await res.json()
+    return { sekolah: data?.sekolah || null, session }
+  } catch {
+    return { sekolah: null, session }
+  }
+}
 
-  const { data: sekolahData } = await supabase
-    .from('identitas_sekolah')
-    .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .single()
-
-  const sekolah = sekolahData || null
+export default async function AdminSekolahPage() {
+  const { sekolah, session } = await getSekolahData()
 
   return (
     <DashboardLayout

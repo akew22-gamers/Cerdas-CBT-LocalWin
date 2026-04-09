@@ -1,6 +1,5 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { DashboardLayout } from '@/components/layout'
 import { GuruTable } from '@/components/admin/GuruTable'
 import { GuruSearchForm } from '@/components/admin/GuruSearchForm'
@@ -19,7 +18,7 @@ interface GuruListPageProps {
   searchParams: Promise<{ search?: string; page?: string }>
 }
 
-export default async function GuruListPage({ searchParams }: GuruListPageProps) {
+async function getGuruList(search: string) {
   const session = await getSession()
 
   if (!session) {
@@ -30,18 +29,22 @@ export default async function GuruListPage({ searchParams }: GuruListPageProps) 
     redirect('/login')
   }
 
-  const supabase = createAdminClient()
-  const { search = '', page = '1' } = await searchParams
-
-  let query = supabase
-    .from('guru')
-    .select('*', { count: 'exact' })
-
-  if (search) {
-    query = query.or(`username.ilike.%${search}%,nama.ilike.%${search}%`)
+  try {
+    const params = new URLSearchParams({ page: '1', limit: '50' })
+    if (search) params.set('search', search)
+    
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/admin/guru?${params.toString()}`, { cache: 'no-store' })
+    const { data } = await res.json()
+    return { guruList: data?.guru || [], session }
+  } catch {
+    return { guruList: [], session }
   }
+}
 
-  const { data: guruList } = await query.order('created_at', { ascending: false }).limit(50)
+export default async function GuruListPage({ searchParams }: GuruListPageProps) {
+  const resolvedParams = await searchParams
+  const { search = '' } = resolvedParams
+  const { guruList, session } = await getGuruList(search)
 
   return (
     <DashboardLayout

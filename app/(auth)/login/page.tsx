@@ -1,37 +1,24 @@
 import { Card, CardContent } from "@/components/ui/card"
 import { LoginForm } from "@/components/auth/LoginForm"
 import { AdminLoginTrigger } from "@/components/auth/AdminLoginTrigger"
-import { createAdminClient } from "@/lib/supabase/admin"
 import { redirect } from "next/navigation"
 
 async function getSetupStatus() {
   try {
-    const supabase = createAdminClient()
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/setup/status`, { cache: 'no-store' })
+    const { data } = await res.json()
     
-    const { data: identitasSekolah, error } = await supabase
-      .from('identitas_sekolah')
-      .select('id, setup_wizard_completed')
-      .maybeSingle()
-
-    if (error) {
+    if (!data || !data.setup_wizard_completed) {
       return { isSetupComplete: false, nama_sekolah: 'Cerdas-CBT' }
     }
 
-    if (!identitasSekolah || !identitasSekolah.setup_wizard_completed) {
-      return { isSetupComplete: false, nama_sekolah: 'Cerdas-CBT' }
-    }
-
-    const { data: sekolah } = await supabase
-      .from('identitas_sekolah')
-      .select('nama_sekolah, logo_url')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single()
+    const sekolahRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/public/sekolah`, { cache: 'no-store' })
+    const { data: sekolahData } = await sekolahRes.json()
 
     return {
       isSetupComplete: true,
-      nama_sekolah: sekolah?.nama_sekolah || 'Cerdas-CBT',
-      logo_url: sekolah?.logo_url
+      nama_sekolah: sekolahData?.sekolah?.nama_sekolah || 'Cerdas-CBT',
+      logo_url: sekolahData?.sekolah?.logo_url
     }
   } catch {
     return { isSetupComplete: false, nama_sekolah: 'Cerdas-CBT' }

@@ -1,12 +1,11 @@
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import { DashboardLayout } from '@/components/layout'
 import { SekolahDisplay } from '@/components/sekolah/SekolahDisplay'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AlertCircle } from 'lucide-react'
 
-export default async function GuruSekolahPage() {
+async function getSekolahData() {
   const session = await getSession()
 
   if (!session) {
@@ -17,16 +16,19 @@ export default async function GuruSekolahPage() {
     redirect('/login')
   }
 
-  const supabase = createAdminClient()
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/guru/sekolah`, { cache: 'no-store' })
+    const { data } = await res.json()
+    return { sekolah: data?.sekolah, session }
+  } catch {
+    return { sekolah: null, session }
+  }
+}
 
-  const { data: sekolahData } = await supabase
-    .from('identitas_sekolah')
-    .select('*')
-    .order('updated_at', { ascending: false })
-    .limit(1)
-    .single()
+export default async function GuruSekolahPage() {
+  const { sekolah, session } = await getSekolahData()
 
-  const sekolah = sekolahData || {
+  const sekolahData = sekolah || {
     nama_sekolah: 'Nama Sekolah belum diatur',
     npsn: null,
     alamat: null,

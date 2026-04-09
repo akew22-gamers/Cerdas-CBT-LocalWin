@@ -1,6 +1,5 @@
 import { redirect, notFound } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { DashboardLayout } from '@/components/layout'
 import { GuruForm } from '@/components/admin/GuruForm'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,7 +8,7 @@ interface EditGuruPageProps {
   params: Promise<{ id: string }>
 }
 
-export default async function EditGuruPage({ params }: EditGuruPageProps) {
+async function getGuruData(id: string) {
   const session = await getSession()
 
   if (!session) {
@@ -20,14 +19,23 @@ export default async function EditGuruPage({ params }: EditGuruPageProps) {
     redirect('/login')
   }
 
-  const supabase = createAdminClient()
-  const { id } = await params
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/admin/guru/${id}`, { cache: 'no-store' })
+    const { data } = await res.json()
+    
+    if (!data?.guru) {
+      return { guruData: null, session }
+    }
+    
+    return { guruData: data.guru, session }
+  } catch {
+    return { guruData: null, session }
+  }
+}
 
-  const { data: guruData } = await supabase
-    .from('guru')
-    .select('*')
-    .eq('id', id)
-    .single()
+export default async function EditGuruPage({ params }: EditGuruPageProps) {
+  const { id } = await params
+  const { guruData, session } = await getGuruData(id)
 
   if (!guruData) {
     notFound()
